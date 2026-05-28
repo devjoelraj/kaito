@@ -48,13 +48,13 @@ const CustomTabBar = ({ state, descriptors, navigation }) => {
                 <Octicons
                   name="checklist"
                   size={24}
-                  color={focused ? "#2563EB" : "#94A3B8"}
+                  color={focused ? "#818CF8" : "#64748B"}
                 />
               ) : (
                 <MaterialIcons
                   name={icons[route.name]}
                   size={24}
-                  color={focused ? "#2563EB" : "#94A3B8"}
+                  color={focused ? "#818CF8" : "#64748B"}
                 />
               )}
 
@@ -62,7 +62,7 @@ const CustomTabBar = ({ state, descriptors, navigation }) => {
                 style={[
                   styles.label,
                   {
-                    color: focused ? "#2563EB" : "#94A3B8",
+                    color: focused ? "#818CF8" : "#64748B",
                   },
                 ]}
               >
@@ -89,16 +89,18 @@ const styles = StyleSheet.create({
 
   tabBar: {
     flexDirection: "row",
-    backgroundColor: "#FFFFFF",
+    backgroundColor: "rgba(30, 41, 59, 0.95)",
     borderRadius: 20,
     paddingVertical: 12,
+    borderWidth: 1,
+    borderColor: "rgba(255, 255, 255, 0.05)",
     shadowColor: "#000",
     shadowOffset: {
       width: 0,
-      height: 5,
+      height: 8,
     },
-    shadowOpacity: 0.1,
-    shadowRadius: 10,
+    shadowOpacity: 0.2,
+    shadowRadius: 16,
     elevation: 10,
   },
 
@@ -111,6 +113,6 @@ const styles = StyleSheet.create({
 
   label: {
     fontSize: 12,
-    fontWeight: "500",
+    fontWeight: "600",
   },
 });

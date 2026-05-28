@@ -43,10 +43,10 @@ const styles = StyleSheet.create({
     width: 64,
     height: 64,
     borderRadius: 32,
-    backgroundColor: "#2563EB",
+    backgroundColor: "#6366F1",
     justifyContent: "center",
     alignItems: "center",
-    shadowColor: "#2563EB",
+    shadowColor: "#6366F1",
     shadowOffset: {
       width: 0,
       height: 8,
