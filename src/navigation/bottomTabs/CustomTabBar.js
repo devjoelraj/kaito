@@ -5,10 +5,12 @@ import { View, Pressable, Text, StyleSheet, Platform } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import MaterialIcons from "@expo/vector-icons/MaterialIcons";
+import Octicons from "@expo/vector-icons/Octicons";
 
 const icons = {
   Dashboard: "dashboard",
   Expenses: "account-balance-wallet",
+  Todo: "checklist",
 };
 
 const CustomTabBar = ({ state, descriptors, navigation }) => {
@@ -42,11 +44,19 @@ const CustomTabBar = ({ state, descriptors, navigation }) => {
 
           return (
             <Pressable key={route.key} onPress={onPress} style={styles.tabItem}>
-              <MaterialIcons
-                name={icons[route.name]}
-                size={24}
-                color={focused ? "#2563EB" : "#94A3B8"}
-              />
+              {route.name === "Todo" ? (
+                <Octicons
+                  name="checklist"
+                  size={24}
+                  color={focused ? "#2563EB" : "#94A3B8"}
+                />
+              ) : (
+                <MaterialIcons
+                  name={icons[route.name]}
+                  size={24}
+                  color={focused ? "#2563EB" : "#94A3B8"}
+                />
+              )}
 
               <Text
                 style={[

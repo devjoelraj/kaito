@@ -16,29 +16,91 @@ import Ionicons from "@expo/vector-icons/Ionicons";
 const { width } = Dimensions.get("window");
 
 const CATEGORIES = [
-  { name: "Food & Drinks", icon: "fast-food-outline", color: "#F59E0B", budget: 400, spend: 84.50 },
-  { name: "Shopping", icon: "basket-outline", color: "#EC4899", budget: 300, spend: 120.00 },
-  { name: "Transport", icon: "car-outline", color: "#3B82F6", budget: 200, spend: 24.30 },
-  { name: "Entertainment", icon: "play-circle-outline", color: "#EF4444", budget: 150, spend: 15.99 },
-  { name: "Utilities", icon: "flash-outline", color: "#A855F7", budget: 250, spend: 112.40 },
+  {
+    name: "Food & Drinks",
+    icon: "fast-food-outline",
+    color: "#F59E0B",
+    budget: 400,
+    spend: 84.5,
+  },
+  {
+    name: "Shopping",
+    icon: "basket-outline",
+    color: "#EC4899",
+    budget: 300,
+    spend: 120.0,
+  },
+  {
+    name: "Transport",
+    icon: "car-outline",
+    color: "#3B82F6",
+    budget: 200,
+    spend: 24.3,
+  },
+  {
+    name: "Entertainment",
+    icon: "play-circle-outline",
+    color: "#EF4444",
+    budget: 150,
+    spend: 15.99,
+  },
+  {
+    name: "Utilities",
+    icon: "flash-outline",
+    color: "#A855F7",
+    budget: 250,
+    spend: 112.4,
+  },
 ];
 
-const WEEKLY_DATA = [
-  { day: "M", amount: 45, label: "Mon" },
-  { day: "T", amount: 75, label: "Tue" },
-  { day: "W", amount: 120, label: "Wed", isToday: true },
-  { day: "T", amount: 30, label: "Thu" },
-  { day: "F", amount: 60, label: "Fri" },
-  { day: "S", amount: 95, label: "Sat" },
-  { day: "S", amount: 15, label: "Sun" },
+const Monthly_DATA = [
+  { day: "jan", amount: 45, label: "Mon" },
+  { day: "feb", amount: 75, label: "Tue" },
+  { day: "mar", amount: 120, label: "Wed", isToday: true },
+  { day: "apr", amount: 30, label: "Thu" },
+  { day: "may", amount: 60, label: "Fri" },
+  { day: "jun", amount: 95, label: "Sat" },
+  { day: "jul", amount: 15, label: "Sun" },
 ];
 
 const Expense = () => {
   const [expenses, setExpenses] = useState([
-    { id: "1", title: "Grocery Shopping", category: "Food & Drinks", amount: 84.50, date: "Today", icon: "fast-food-outline", color: "#F59E0B" },
-    { id: "2", title: "New Sneakers", category: "Shopping", amount: 120.00, date: "Yesterday", icon: "basket-outline", color: "#EC4899" },
-    { id: "3", title: "Electricity Bill", category: "Utilities", amount: 112.40, date: "May 15", icon: "flash-outline", color: "#A855F7" },
-    { id: "4", title: "Uber Ride", category: "Transport", amount: 24.30, date: "May 17", icon: "car-outline", color: "#3B82F6" },
+    {
+      id: "1",
+      title: "Grocery Shopping",
+      category: "Food & Drinks",
+      amount: 84.5,
+      date: "Today",
+      icon: "fast-food-outline",
+      color: "#F59E0B",
+    },
+    {
+      id: "2",
+      title: "New Sneakers",
+      category: "Shopping",
+      amount: 120.0,
+      date: "Yesterday",
+      icon: "basket-outline",
+      color: "#EC4899",
+    },
+    {
+      id: "3",
+      title: "Electricity Bill",
+      category: "Utilities",
+      amount: 112.4,
+      date: "May 15",
+      icon: "flash-outline",
+      color: "#A855F7",
+    },
+    {
+      id: "4",
+      title: "Uber Ride",
+      category: "Transport",
+      amount: 24.3,
+      date: "May 17",
+      icon: "car-outline",
+      color: "#3B82F6",
+    },
   ]);
 
   const [modalVisible, setModalVisible] = useState(false);
@@ -53,7 +115,8 @@ const Expense = () => {
   const handleAddExpense = () => {
     if (!title || !amount) return;
 
-    const selectedCat = CATEGORIES.find(c => c.name === category) || CATEGORIES[0];
+    const selectedCat =
+      CATEGORIES.find((c) => c.name === category) || CATEGORIES[0];
     const newExpense = {
       id: Date.now().toString(),
       title,
@@ -71,7 +134,12 @@ const Expense = () => {
   };
 
   return (
-    <ScreenWrapper scroll backgroundColor="#0F172A" barStyle="light-content" contentContainerStyle={styles.scrollContent}>
+    <ScreenWrapper
+      scroll
+      backgroundColor="#0F172A"
+      barStyle="light-content"
+      contentContainerStyle={styles.scrollContent}
+    >
       <View style={styles.container}>
         {/* Header */}
         <View style={styles.header}>
@@ -97,7 +165,9 @@ const Expense = () => {
           <View style={styles.budgetHeader}>
             <View>
               <Text style={styles.budgetLabel}>MONTHLY BUDGET LIMIT</Text>
-              <Text style={styles.budgetLimitText}>${budgetLimit.toFixed(2)}</Text>
+              <Text style={styles.budgetLimitText}>
+                ${budgetLimit.toFixed(2)}
+              </Text>
             </View>
             <View style={styles.spentBadge}>
               <Text style={styles.spentBadgeText}>
@@ -118,23 +188,25 @@ const Expense = () => {
           </View>
 
           <View style={styles.budgetFooter}>
-            <Text style={styles.spentText}>Spent: ${totalSpent.toFixed(2)}</Text>
+            <Text style={styles.spentText}>
+              Spent: ${totalSpent.toFixed(2)}
+            </Text>
             <Text style={styles.remainingText}>
               Remaining: ${(budgetLimit - totalSpent).toFixed(2)}
             </Text>
           </View>
         </View>
 
-        {/* Weekly Spending Graph */}
-        <Text style={styles.sectionTitle}>Weekly Activity</Text>
+        {/* Monthly Spending Graph */}
+        <Text style={styles.sectionTitle}>Monthly Activity</Text>
         <View style={styles.chartCard}>
           <View style={styles.chartHeader}>
-            <Text style={styles.chartSub}>Average spending this week</Text>
+            <Text style={styles.chartSub}>Average spending this month</Text>
             <Text style={styles.chartAvg}>$62.40 / day</Text>
           </View>
 
           <View style={styles.chartContainer}>
-            {WEEKLY_DATA.map((item, index) => {
+            {Monthly_DATA.map((item, index) => {
               const maxVal = 130;
               const pct = (item.amount / maxVal) * 100;
               return (
@@ -164,14 +236,39 @@ const Expense = () => {
           </View>
         </View>
 
+        {/* Expense History List */}
+        <Text style={styles.sectionTitle}>Expense Logs</Text>
+        <View style={styles.expensesList}>
+          {expenses.map((exp) => (
+            <View key={exp.id} style={styles.expenseItem}>
+              <View
+                style={[
+                  styles.expenseIconWrapper,
+                  { backgroundColor: `${exp.color}15` },
+                ]}
+              >
+                <Ionicons name={exp.icon} size={20} color={exp.color} />
+              </View>
+              <View style={styles.expenseDetails}>
+                <Text style={styles.expenseTitle}>{exp.title}</Text>
+                <Text style={styles.expenseMeta}>
+                  {exp.category} • {exp.date}
+                </Text>
+              </View>
+              <Text style={styles.expenseAmount}>
+                -${exp.amount.toFixed(2)}
+              </Text>
+            </View>
+          ))}
+        </View>
         {/* Category Budget Tracker */}
         <Text style={styles.sectionTitle}>Budgets by Category</Text>
         <View style={styles.categoriesCard}>
           {CATEGORIES.map((cat, idx) => {
             const currentSpent = expenses
-              .filter(e => e.category === cat.name)
+              .filter((e) => e.category === cat.name)
               .reduce((sum, item) => sum + item.amount, 0);
-            
+
             const catProgress = currentSpent / cat.budget;
             return (
               <View key={idx} style={styles.categoryProgressRow}>
@@ -198,25 +295,6 @@ const Expense = () => {
               </View>
             );
           })}
-        </View>
-
-        {/* Expense History List */}
-        <Text style={styles.sectionTitle}>Expense Logs</Text>
-        <View style={styles.expensesList}>
-          {expenses.map((exp) => (
-            <View key={exp.id} style={styles.expenseItem}>
-              <View style={[styles.expenseIconWrapper, { backgroundColor: `${exp.color}15` }]}>
-                <Ionicons name={exp.icon} size={20} color={exp.color} />
-              </View>
-              <View style={styles.expenseDetails}>
-                <Text style={styles.expenseTitle}>{exp.title}</Text>
-                <Text style={styles.expenseMeta}>
-                  {exp.category} • {exp.date}
-                </Text>
-              </View>
-              <Text style={styles.expenseAmount}>-${exp.amount.toFixed(2)}</Text>
-            </View>
-          ))}
         </View>
       </View>
 
@@ -280,7 +358,10 @@ const Expense = () => {
                     <Text
                       style={[
                         styles.categoryOptionText,
-                        category === cat.name && { color: "#FFFFFF", fontWeight: "600" },
+                        category === cat.name && {
+                          color: "#FFFFFF",
+                          fontWeight: "600",
+                        },
                       ]}
                     >
                       {cat.name}
@@ -290,7 +371,11 @@ const Expense = () => {
               </View>
             </View>
 
-            <TouchableOpacity style={styles.submitBtn} onPress={handleAddExpense} activeOpacity={0.8}>
+            <TouchableOpacity
+              style={styles.submitBtn}
+              onPress={handleAddExpense}
+              activeOpacity={0.8}
+            >
               <LinearGradient
                 colors={["#6366F1", "#A855F7"]}
                 start={{ x: 0, y: 0 }}
@@ -627,4 +712,3 @@ const styles = StyleSheet.create({
     fontWeight: "600",
   },
 });
-
