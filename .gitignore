@@ -1,0 +1,94 @@
+# ==========================
+# Dependencies
+# ==========================
+node_modules/
+
+# ==========================
+# Environment Variables
+# ==========================
+.env
+.env.*
+!.env.example
+
+# ==========================
+# Expo
+# ==========================
+.expo/
+.expo-shared/
+dist/
+web-build/
+expo-env.d.ts
+
+# ==========================
+# React Native
+# ==========================
+.kotlin/
+android/app/build/
+android/.gradle/
+android/local.properties
+
+ios/build/
+ios/Pods/
+
+# Metro
+.metro-health-check*
+
+# ==========================
+# Logs
+# ==========================
+logs/
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# ==========================
+# Native Certificates
+# ==========================
+*.jks
+*.p8
+*.p12
+*.key
+*.pem
+*.mobileprovision
+
+# ==========================
+# Build / Coverage
+# ==========================
+build/
+coverage/
+
+# ==========================
+# IDE
+# ==========================
+.vscode/*
+!.vscode/extensions.json
+
+.idea/
+
+# ==========================
+# OS Files
+# ==========================
+.DS_Store
+Thumbs.db
+
+# ==========================
+# Cache
+# ==========================
+.cache/
+.parcel-cache/
+
+# ==========================
+# Testing
+# ==========================
+jest-cache/
+.nyc_output/
+
+# ==========================
+# Temporary Files
+# ==========================
+*.tmp
+*.temp
+*.swp
+*.tsbuildinfo
+*.orig.*
