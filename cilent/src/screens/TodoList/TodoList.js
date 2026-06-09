@@ -1,9 +1,7 @@
-import React, { useState } from "react";
-
+import React, { useState, useEffect, useCallback } from "react";
 import {
   View,
   Text,
-  StyleSheet,
   TouchableOpacity,
   FlatList,
   Modal,
@@ -12,281 +10,454 @@ import {
   Platform,
   TouchableWithoutFeedback,
   Keyboard,
+  StyleSheet,
+  ActivityIndicator,
+  Alert,
 } from "react-native";
-
+import AsyncStorage from "@react-native-async-storage/async-storage";
 import DateTimePicker from "@react-native-community/datetimepicker";
-
 import MaterialIcons from "@expo/vector-icons/MaterialIcons";
-
 import { Swipeable } from "react-native-gesture-handler";
-
 import ScreenWrapper from "../../components/layout/AppWrapper";
-
 import FloatingBar from "../../components/FloatingBar";
+import {
+  createTodoService,
+  getTodosService,
+  getTodosByDateService,
+  updateTodoService,
+  deleteTodoService,
+} from "../../api/TodoServices";
 
-const dates = [
-  { day: "All", date: "All" },
-  { day: "Thu", date: 26, active: true },
-  { day: "Fri", date: 27 },
-  { day: "Sat", date: 28 },
-  { day: "Sun", date: 29 },
-  { day: "Mon", date: 30 },
-];
+const getWeekDates = () => {
+  const today = new Date();
+  const startOfWeek = new Date(today);
+  startOfWeek.setDate(today.getDate() - today.getDay());
+  const weekDays = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+  const dates = [
+    {
+      id: "all",
+      day: "All",
+      date: "All",
+      fullDate: "all",
+    },
+  ];
 
-const initialTasks = [
-  {
-    id: "1",
-    time: "06:00",
-    title: "Drink 8 glasses of water",
-    duration: "1h",
-    color: "rgba(108, 124, 255, 0.12)",
-    dot: "#6C7CFF",
-    completed: false,
-  },
-  {
-    id: "2",
-    time: "09:00",
-    title: "Get a notebook",
-    duration: "1h",
-    color: "rgba(200, 92, 200, 0.12)",
-    dot: "#C85CC8",
-    completed: false,
-  },
-  {
-    id: "3",
-    time: "10:00",
-    title: "Work",
-    duration: "4h",
-    color: "rgba(57, 193, 108, 0.15)",
-    dot: "#39C16C",
-    completed: false,
-  },
-];
+  for (let i = 0; i < 7; i++) {
+    const currentDate = new Date(startOfWeek);
+    currentDate.setDate(startOfWeek.getDate() + i);
+    dates.push({
+      id: currentDate.toISOString(),
+      day: weekDays[currentDate.getDay()],
+      date: currentDate.getDate(),
+      fullDate: currentDate.toISOString().split("T")[0],
+    });
+  }
+  return dates;
+};
 
-const TodoList = () => {
-  const [taskList, setTaskList] = useState(initialTasks);
-
+const TodoList = ({ navigation }) => {
+  const [taskList, setTaskList] = useState([]);
+  const [loading, setLoading] = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
+  const [weekDates] = useState(getWeekDates());
+  const [selectedDate, setSelectedDate] = useState(
+    new Date().toISOString().split("T")[0],
+  );
   const [isModalVisible, setIsModalVisible] = useState(false);
-
   const [taskTitle, setTaskTitle] = useState("");
-
   const [taskTitleError, setTaskTitleError] = useState("");
-
   const [taskTime, setTaskTime] = useState(new Date());
-
   const [showTimePicker, setShowTimePicker] = useState(false);
-
   const [taskPriority, setTaskPriority] = useState("second");
+  const [editingTask, setEditingTask] = useState(null);
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
+
+  const today = new Date();
+  const currentMonth = today.toLocaleString("default", { month: "short" });
+  const currentDate = today.getDate();
+
+  useEffect(() => {
+    checkAuth();
+  }, []);
+
+  const checkAuth = async () => {
+    try {
+      const token = await AsyncStorage.getItem("userToken");
+      if (!token) {
+        navigation.navigate("Login"); // Use navigate instead of replace
+      } else {
+        setIsAuthenticated(true);
+      }
+    } catch (error) {
+      console.error("Auth check error:", error);
+      navigation.navigate("Login");
+    }
+  };
 
   const formatTime = (date) => {
     const hours = date.getHours();
-
     const minutes = date.getMinutes();
-
-    const formattedHours = hours < 10 ? `0${hours}` : hours;
-
-    const formattedMinutes = minutes < 10 ? `0${minutes}` : minutes;
-
-    return `${formattedHours}:${formattedMinutes}`;
+    return `${hours.toString().padStart(2, "0")}:${minutes
+      .toString()
+      .padStart(2, "0")}`;
   };
 
+  const formatTimeFromString = (timeString) => {
+    if (!timeString) return new Date();
+    const [hours, minutes] = timeString.split(":");
+    const date = new Date();
+    date.setHours(parseInt(hours, 10));
+    date.setMinutes(parseInt(minutes, 10));
+    date.setSeconds(0);
+    return date;
+  };
+
+  const getPriorityColor = (priority) => {
+    const priorityStyles = {
+      first: { dot: "#EF4444", color: "rgba(239,68,68,0.12)" },
+      second: { dot: "#6C7CFF", color: "rgba(108,124,255,0.12)" },
+      least: { dot: "#39C16C", color: "rgba(57,193,108,0.15)" },
+    };
+    return priorityStyles[priority] || priorityStyles.second;
+  };
+
+  const fetchTodos = useCallback(async () => {
+    if (!isAuthenticated) return;
+    try {
+      setLoading(true);
+      let response;
+      if (selectedDate === "all") {
+        response = await getTodosService();
+      } else {
+        response = await getTodosByDateService(selectedDate);
+      }
+
+      let todosArray = [];
+      if (response && response.data) {
+        todosArray = response.data;
+      } else if (response && Array.isArray(response)) {
+        todosArray = response;
+      }
+
+      const transformedTasks = todosArray.map((todo) => ({
+        id: todo.id.toString(),
+        title: todo.title,
+        time: todo.time,
+        date: todo.date,
+        duration: todo.duration || "1h",
+        completed: todo.completed || false,
+        priority: todo.priority || "second",
+        color: getPriorityColor(todo.priority || "second").color,
+        dot: getPriorityColor(todo.priority || "second").dot,
+      }));
+      setTaskList(transformedTasks);
+    } catch (error) {
+      console.error("Fetch todos error:", error);
+      if (error.response?.status === 401) {
+        await AsyncStorage.removeItem("userToken");
+        Alert.alert("Session Expired", "Please login again.", [
+          { text: "OK", onPress: () => navigation.navigate("Login") },
+        ]);
+      } else {
+        Alert.alert("Error", "Failed to load todos. Please try again.");
+      }
+    } finally {
+      setLoading(false);
+    }
+  }, [selectedDate, isAuthenticated, navigation]);
+
+  useEffect(() => {
+    if (isAuthenticated) {
+      fetchTodos();
+    }
+  }, [fetchTodos, isAuthenticated]);
+
   const handleOpenModal = () => {
+    setEditingTask(null);
     setTaskTitle("");
-
     setTaskTitleError("");
-
     const defaultTime = new Date();
-
     defaultTime.setHours(0);
-
     defaultTime.setMinutes(0);
-
     defaultTime.setSeconds(0);
-
     setTaskTime(defaultTime);
-
     setTaskPriority("second");
-
     setShowTimePicker(false);
+    setIsModalVisible(true);
+  };
 
+  const handleEditTask = (task) => {
+    setEditingTask(task);
+    setTaskTitle(task.title);
+    setTaskTime(formatTimeFromString(task.time));
+    setTaskPriority(task.priority || "second");
+    setTaskTitleError("");
+    setShowTimePicker(false);
     setIsModalVisible(true);
   };
 
   const handleTitleChange = (text) => {
     setTaskTitle(text);
-
     if (text.trim()) {
       setTaskTitleError("");
     }
   };
 
-  const handleAddTask = () => {
+  const handleAddTask = async () => {
     if (!taskTitle.trim()) {
       setTaskTitleError("Task name is required.");
-
       return;
     }
 
-    const priorityStyles = {
-      first: {
-        dot: "#EF4444",
-        color: "rgba(239, 68, 68, 0.12)",
-      },
+    try {
+      const todoData = {
+        title: taskTitle.trim(),
+        time: formatTime(taskTime),
+        date: selectedDate,
+        duration: "1h",
+        completed: false,
+        priority: taskPriority,
+      };
 
-      second: {
-        dot: "#6C7CFF",
-        color: "rgba(108, 124, 255, 0.12)",
-      },
-
-      least: {
-        dot: "#39C16C",
-        color: "rgba(57, 193, 108, 0.15)",
-      },
-    };
-
-    const priorityData = priorityStyles[taskPriority];
-
-    const newTodo = {
-      id: Date.now().toString(),
-      time: formatTime(taskTime),
-      title: taskTitle.trim(),
-      duration: "1h",
-      color: priorityData.color,
-      dot: priorityData.dot,
-      completed: false,
-    };
-
-    setTaskList((prev) => [...prev, newTodo]);
-
-    setIsModalVisible(false);
+      let response;
+      if (editingTask) {
+        response = await updateTodoService(editingTask.id, todoData);
+        if (response && response.data) {
+          const updatedTask = {
+            id: response.data.id.toString(),
+            title: response.data.title,
+            time: response.data.time,
+            date: response.data.date,
+            duration: response.data.duration || "1h",
+            completed: response.data.completed || false,
+            priority: response.data.priority,
+            color: getPriorityColor(response.data.priority).color,
+            dot: getPriorityColor(response.data.priority).dot,
+          };
+          setTaskList((prev) =>
+            prev.map((task) =>
+              task.id === editingTask.id ? updatedTask : task,
+            ),
+          );
+        }
+      } else {
+        response = await createTodoService(todoData);
+        if (response && response.data) {
+          const newTask = {
+            id: response.data.id.toString(),
+            title: response.data.title,
+            time: response.data.time,
+            date: response.data.date,
+            duration: response.data.duration || "1h",
+            completed: response.data.completed || false,
+            priority: response.data.priority,
+            color: getPriorityColor(response.data.priority).color,
+            dot: getPriorityColor(response.data.priority).dot,
+          };
+          setTaskList((prev) => [...prev, newTask]);
+        }
+      }
+      setIsModalVisible(false);
+      setEditingTask(null);
+    } catch (error) {
+      console.error("Save task error:", error);
+      if (error.response?.status === 401) {
+        Alert.alert("Session Expired", "Please login again.", [
+          { text: "OK", onPress: () => navigation.navigate("Login") },
+        ]);
+      } else {
+        Alert.alert("Error", "Failed to save task. Please try again.");
+      }
+    }
   };
 
-  const handleDeleteTask = (id) => {
-    setTaskList((prev) => prev.filter((task) => task.id !== id));
-  };
-
-  const toggleTaskComplete = (id) => {
-    setTaskList((prev) =>
-      prev.map((task) =>
-        task.id === id
-          ? {
-              ...task,
-              completed: !task.completed,
+  const handleDeleteTask = async (id) => {
+    Alert.alert("Delete Task", "Are you sure you want to delete this task?", [
+      { text: "Cancel", style: "cancel" },
+      {
+        text: "Delete",
+        style: "destructive",
+        onPress: async () => {
+          try {
+            await deleteTodoService(id);
+            setTaskList((prev) => prev.filter((task) => task.id !== id));
+          } catch (error) {
+            console.error("Delete task error:", error);
+            if (error.response?.status === 401) {
+              Alert.alert("Session Expired", "Please login again.", [
+                { text: "OK", onPress: () => navigation.navigate("Login") },
+              ]);
+            } else {
+              Alert.alert("Error", "Failed to delete task. Please try again.");
             }
-          : task,
-      ),
-    );
+          }
+        },
+      },
+    ]);
   };
 
-  const pendingTasks = taskList.filter((task) => !task.completed);
+  const toggleTaskComplete = async (id) => {
+    const task = taskList.find((t) => t.id === id);
+    if (!task) return;
 
-  const completedTasks = taskList.filter((task) => task.completed);
-
-  const renderRightActions = (id) => {
-    return (
-      <TouchableOpacity
-        style={styles.deleteContainer}
-        activeOpacity={0.8}
-        onPress={() => handleDeleteTask(id)}
-      >
-        <MaterialIcons name="delete" size={26} color="#FFFFFF" />
-      </TouchableOpacity>
-    );
+    try {
+      const updateData = { completed: !task.completed };
+      const response = await updateTodoService(id, updateData);
+      if (response && response.data) {
+        setTaskList((prev) =>
+          prev.map((taskItem) =>
+            taskItem.id === id
+              ? { ...taskItem, completed: !taskItem.completed }
+              : taskItem,
+          ),
+        );
+      }
+    } catch (error) {
+      console.error("Toggle task complete error:", error);
+      Alert.alert("Error", "Failed to update task status. Please try again.");
+    }
   };
 
-  const renderTask = ({ item }) => {
-    return (
-      <View style={styles.taskRow}>
-        <Text style={styles.time}>{item.time}</Text>
+  const onRefresh = async () => {
+    setRefreshing(true);
+    await fetchTodos();
+    setRefreshing(false);
+  };
 
-        <View style={{ flex: 1 }}>
-          <Swipeable
-            overshootRight={false}
-            renderRightActions={() => renderRightActions(item.id)}
+  const handleLogout = async () => {
+    Alert.alert("Logout", "Are you sure you want to logout?", [
+      { text: "Cancel", style: "cancel" },
+      {
+        text: "Logout",
+        style: "destructive",
+        onPress: async () => {
+          await AsyncStorage.removeItem("userToken");
+          navigation.navigate("Login");
+        },
+      },
+    ]);
+  };
+
+  const filteredTasks =
+    selectedDate === "all"
+      ? taskList
+      : taskList.filter((task) => task.date === selectedDate);
+
+  const pendingTasks = filteredTasks.filter((task) => !task.completed);
+  const completedTasks = filteredTasks.filter((task) => task.completed);
+
+  const renderRightActions = (id) => (
+    <TouchableOpacity
+      style={styles.deleteContainer}
+      activeOpacity={0.8}
+      onPress={() => handleDeleteTask(id)}
+    >
+      <MaterialIcons name="delete" size={26} color="#FFFFFF" />
+    </TouchableOpacity>
+  );
+
+  const renderTask = ({ item }) => (
+    <View style={styles.taskRow}>
+      <Text style={styles.time}>{item.time}</Text>
+      <View style={{ flex: 1 }}>
+        <Swipeable
+          overshootRight={false}
+          renderRightActions={() => renderRightActions(item.id)}
+        >
+          <TouchableOpacity
+            activeOpacity={0.85}
+            onPress={() => toggleTaskComplete(item.id)}
+            onLongPress={() => handleEditTask(item)}
+            style={[
+              styles.taskCard,
+              {
+                backgroundColor: item.color,
+                opacity: item.completed ? 0.55 : 1,
+              },
+            ]}
           >
-            <TouchableOpacity
-              activeOpacity={0.85}
-              onPress={() => toggleTaskComplete(item.id)}
-              style={[
-                styles.taskCard,
-                {
-                  backgroundColor: item.color,
-                  opacity: item.completed ? 0.55 : 1,
-                },
-              ]}
-            >
-              <View style={styles.taskContent}>
-                <View style={styles.leftTask}>
-                  <View
-                    style={[
-                      styles.dot,
-                      {
-                        backgroundColor: item.dot,
-                      },
-                    ]}
-                  />
-
-                  <Text
-                    style={[
-                      styles.taskTitle,
-                      item.completed && styles.completedTaskText,
-                    ]}
-                  >
-                    {item.title}
-                  </Text>
-                </View>
-
-                <View style={styles.rightSection}>
-                  {item.completed && (
-                    <MaterialIcons
-                      name="check-circle"
-                      size={22}
-                      color="#22C55E"
-                    />
-                  )}
-
-                  <Text style={styles.duration}>{item.duration}</Text>
-                </View>
+            <View style={styles.taskContent}>
+              <View style={styles.leftTask}>
+                <View style={[styles.dot, { backgroundColor: item.dot }]} />
+                <Text
+                  style={[
+                    styles.taskTitle,
+                    item.completed && styles.completedTaskText,
+                  ]}
+                >
+                  {item.title}
+                </Text>
               </View>
-            </TouchableOpacity>
-          </Swipeable>
-        </View>
+              <View style={styles.rightSection}>
+                {item.completed && (
+                  <MaterialIcons
+                    name="check-circle"
+                    size={22}
+                    color="#22C55E"
+                  />
+                )}
+                <Text style={styles.duration}>{item.duration}</Text>
+              </View>
+            </View>
+          </TouchableOpacity>
+        </Swipeable>
       </View>
+    </View>
+  );
+
+  if (loading && !refreshing) {
+    return (
+      <ScreenWrapper backgroundColor="#0F172A" barStyle="light-content">
+        <View style={styles.loadingContainer}>
+          <ActivityIndicator size="large" color="#6C7CFF" />
+        </View>
+      </ScreenWrapper>
     );
-  };
+  }
 
   return (
     <ScreenWrapper backgroundColor="#0F172A" barStyle="light-content">
       <View style={styles.container}>
-        {/* HEADER */}
-
         <View style={styles.header}>
           <Text style={styles.headerTitle}>
-            Calendar <Text style={styles.grayText}>26 Dec</Text>
+            Calendar{" "}
+            <Text style={styles.grayText}>
+              {currentDate} {currentMonth}
+            </Text>
           </Text>
+          <TouchableOpacity onPress={handleLogout} style={styles.logoutButton}>
+            <MaterialIcons name="logout" size={24} color="#94A3B8" />
+          </TouchableOpacity>
         </View>
-
-        {/* DATE LIST */}
 
         <FlatList
           horizontal
-          data={dates}
-          keyExtractor={(item, index) => index.toString()}
+          data={weekDates}
+          keyExtractor={(item) => item.id}
           showsHorizontalScrollIndicator={false}
           style={styles.dateList}
           renderItem={({ item }) => (
             <TouchableOpacity
               activeOpacity={0.8}
-              style={[styles.dateBox, item.active && styles.activeDateBox]}
+              onPress={() => setSelectedDate(item.fullDate)}
+              style={[
+                styles.dateBox,
+                item.fullDate === selectedDate && styles.activeDateBox,
+              ]}
             >
               <Text
-                style={[styles.dayText, item.active && styles.activeDayText]}
+                style={[
+                  styles.dayText,
+                  item.fullDate === selectedDate && styles.activeDayText,
+                ]}
               >
                 {item.day}
               </Text>
-
               <Text
-                style={[styles.dateText, item.active && styles.activeDateText]}
+                style={[
+                  styles.dateText,
+                  item.fullDate === selectedDate && styles.activeDateText,
+                ]}
               >
                 {item.date}
               </Text>
@@ -294,27 +465,38 @@ const TodoList = () => {
           )}
         />
 
-        {/* TASK LIST */}
-
         <FlatList
           data={[
-            { type: "header", title: "Pending Tasks" },
+            { type: "pendingHeader" },
             ...pendingTasks,
-            { type: "completedHeader", title: "Completed Tasks" },
+            { type: "completedHeader" },
             ...completedTasks,
           ]}
           keyExtractor={(item, index) => item.id || index.toString()}
           showsVerticalScrollIndicator={false}
           contentContainerStyle={styles.taskList}
+          refreshing={refreshing}
+          onRefresh={onRefresh}
+          ListEmptyComponent={
+            <View style={styles.emptyContainer}>
+              <MaterialIcons name="assignment" size={64} color="#334155" />
+              <Text style={styles.emptyText}>No tasks for this day</Text>
+              <Text style={styles.emptySubText}>
+                Tap the + button to add a new task
+              </Text>
+            </View>
+          }
           renderItem={({ item }) => {
-            if (item.type === "header") {
-              return <Text style={styles.sectionHeader}>Pending Tasks</Text>;
+            if (item.type === "pendingHeader") {
+              return pendingTasks.length > 0 ? (
+                <Text style={styles.sectionHeader}>Pending Tasks</Text>
+              ) : null;
             }
-
             if (item.type === "completedHeader") {
-              return <Text style={styles.sectionHeader}>Completed Tasks</Text>;
+              return completedTasks.length > 0 ? (
+                <Text style={styles.sectionHeader}>Completed Tasks</Text>
+              ) : null;
             }
-
             return renderTask({ item });
           }}
         />
@@ -322,13 +504,15 @@ const TodoList = () => {
 
       <FloatingBar onPress={handleOpenModal} />
 
-      {/* MODAL */}
-
+      {/* Modal */}
       <Modal
         visible={isModalVisible}
         transparent
         animationType="slide"
-        onRequestClose={() => setIsModalVisible(false)}
+        onRequestClose={() => {
+          setIsModalVisible(false);
+          setEditingTask(null);
+        }}
       >
         <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
           <View style={styles.modalOverlay}>
@@ -338,14 +522,12 @@ const TodoList = () => {
             >
               <View style={styles.modalContent}>
                 <View style={styles.modalHandle} />
-
-                <Text style={styles.modalTitle}>Add New Task</Text>
-
-                {/* TASK NAME */}
+                <Text style={styles.modalTitle}>
+                  {editingTask ? "Edit Task" : "Add New Task"}
+                </Text>
 
                 <View style={styles.formGroup}>
                   <Text style={styles.label}>Task Name</Text>
-
                   <TextInput
                     style={[styles.input, taskTitleError && styles.inputError]}
                     placeholder="What needs to be done?"
@@ -353,21 +535,16 @@ const TodoList = () => {
                     value={taskTitle}
                     onChangeText={handleTitleChange}
                   />
-
                   {taskTitleError ? (
                     <Text style={styles.errorText}>{taskTitleError}</Text>
                   ) : null}
                 </View>
 
-                {/* TIME */}
-
                 <View style={styles.formGroup}>
                   <Text style={styles.label}>Time</Text>
-
                   {Platform.OS === "ios" ? (
                     <View style={styles.iosPickerWrapper}>
                       <Text style={styles.iosPickerLabel}>Select Time</Text>
-
                       <DateTimePicker
                         value={taskTime}
                         mode="time"
@@ -375,9 +552,7 @@ const TodoList = () => {
                         display="default"
                         themeVariant="dark"
                         onChange={(event, selectedDate) => {
-                          if (selectedDate) {
-                            setTaskTime(selectedDate);
-                          }
+                          if (selectedDate) setTaskTime(selectedDate);
                         }}
                       />
                     </View>
@@ -391,14 +566,12 @@ const TodoList = () => {
                         <Text style={styles.timePickerButtonText}>
                           {formatTime(taskTime)}
                         </Text>
-
                         <MaterialIcons
                           name="access-time"
                           size={20}
                           color="#94A3B8"
                         />
                       </TouchableOpacity>
-
                       {showTimePicker && (
                         <DateTimePicker
                           value={taskTime}
@@ -407,10 +580,7 @@ const TodoList = () => {
                           display="default"
                           onChange={(event, selectedDate) => {
                             setShowTimePicker(false);
-
-                            if (selectedDate) {
-                              setTaskTime(selectedDate);
-                            }
+                            if (selectedDate) setTaskTime(selectedDate);
                           }}
                         />
                       )}
@@ -418,11 +588,8 @@ const TodoList = () => {
                   )}
                 </View>
 
-                {/* PRIORITY */}
-
                 <View style={styles.formGroup}>
                   <Text style={styles.label}>Priority</Text>
-
                   <View style={styles.priorityContainer}>
                     <TouchableOpacity
                       activeOpacity={0.8}
@@ -436,12 +603,9 @@ const TodoList = () => {
                       <View
                         style={[
                           styles.priorityDot,
-                          {
-                            backgroundColor: "#EF4444",
-                          },
+                          { backgroundColor: "#EF4444" },
                         ]}
                       />
-
                       <Text
                         style={[
                           styles.priorityText,
@@ -451,7 +615,6 @@ const TodoList = () => {
                         First
                       </Text>
                     </TouchableOpacity>
-
                     <TouchableOpacity
                       activeOpacity={0.8}
                       style={[
@@ -464,12 +627,9 @@ const TodoList = () => {
                       <View
                         style={[
                           styles.priorityDot,
-                          {
-                            backgroundColor: "#6C7CFF",
-                          },
+                          { backgroundColor: "#6C7CFF" },
                         ]}
                       />
-
                       <Text
                         style={[
                           styles.priorityText,
@@ -480,7 +640,6 @@ const TodoList = () => {
                         Second
                       </Text>
                     </TouchableOpacity>
-
                     <TouchableOpacity
                       activeOpacity={0.8}
                       style={[
@@ -493,12 +652,9 @@ const TodoList = () => {
                       <View
                         style={[
                           styles.priorityDot,
-                          {
-                            backgroundColor: "#39C16C",
-                          },
+                          { backgroundColor: "#39C16C" },
                         ]}
                       />
-
                       <Text
                         style={[
                           styles.priorityText,
@@ -511,23 +667,25 @@ const TodoList = () => {
                   </View>
                 </View>
 
-                {/* BUTTONS */}
-
                 <View style={styles.buttonContainer}>
                   <TouchableOpacity
                     activeOpacity={0.8}
                     style={styles.cancelButton}
-                    onPress={() => setIsModalVisible(false)}
+                    onPress={() => {
+                      setIsModalVisible(false);
+                      setEditingTask(null);
+                    }}
                   >
                     <Text style={styles.cancelButtonText}>Cancel</Text>
                   </TouchableOpacity>
-
                   <TouchableOpacity
                     activeOpacity={0.8}
                     style={styles.addButton}
                     onPress={handleAddTask}
                   >
-                    <Text style={styles.addButtonText}>Add Task</Text>
+                    <Text style={styles.addButtonText}>
+                      {editingTask ? "Update Task" : "Add Task"}
+                    </Text>
                   </TouchableOpacity>
                 </View>
               </View>
@@ -538,7 +696,6 @@ const TodoList = () => {
     </ScreenWrapper>
   );
 };
-
 export default TodoList;
 
 const styles = StyleSheet.create({
@@ -701,6 +858,31 @@ const styles = StyleSheet.create({
 
   keyboardAvoidingView: {
     width: "100%",
+  },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
+    backgroundColor: "#0F172A",
+  },
+  logoutButton: {
+    padding: 8,
+  },
+  emptyContainer: {
+    alignItems: "center",
+    justifyContent: "center",
+    paddingVertical: 60,
+  },
+  emptyText: {
+    color: "#94A3B8",
+    fontSize: 18,
+    fontWeight: "500",
+    marginTop: 16,
+  },
+  emptySubText: {
+    color: "#64748B",
+    fontSize: 14,
+    marginTop: 8,
   },
 
   modalContent: {

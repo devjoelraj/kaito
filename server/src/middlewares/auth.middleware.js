@@ -12,7 +12,7 @@ export const protect = (req, res, next) => {
 
   try {
     const decoded = jwt.verify(token, JWT_SECRET);
-    console.log("✅ Decoded token:", decoded);
+    console.log(" Decoded token:", decoded);
     req.user = decoded;
     next();
   } catch (error) {
