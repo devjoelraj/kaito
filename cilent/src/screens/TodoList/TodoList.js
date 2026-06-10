@@ -20,6 +20,7 @@ import MaterialIcons from "@expo/vector-icons/MaterialIcons";
 import { Swipeable } from "react-native-gesture-handler";
 import ScreenWrapper from "../../components/layout/AppWrapper";
 import FloatingBar from "../../components/FloatingBar";
+import LoadingSpinner from "../../components/loading/LoadingSpinner";
 import {
   createTodoService,
   getTodosService,
@@ -82,15 +83,15 @@ const TodoList = ({ navigation }) => {
 
   const checkAuth = async () => {
     try {
-      const token = await AsyncStorage.getItem("userToken");
+      const token = await AsyncStorage.getItem("token");
       if (!token) {
-        navigation.navigate("Login"); // Use navigate instead of replace
+        navigation.replace("Auth"); // Switch to Auth stack
       } else {
         setIsAuthenticated(true);
       }
     } catch (error) {
       console.error("Auth check error:", error);
-      navigation.navigate("Login");
+      navigation.replace("Auth");
     }
   };
 
@@ -133,17 +134,22 @@ const TodoList = ({ navigation }) => {
       }
 
       let todosArray = [];
-      if (response && response.data) {
-        todosArray = response.data;
+      if (response && response.todos) {
+        todosArray = response.todos;
       } else if (response && Array.isArray(response)) {
         todosArray = response;
+      } else if (response && response.data) {
+        todosArray = response.data;
       }
 
       const transformedTasks = todosArray.map((todo) => ({
-        id: todo.id.toString(),
+        id: (todo._id || todo.id).toString(),
         title: todo.title,
         time: todo.time,
-        date: todo.date,
+        date:
+          typeof todo.date === "string"
+            ? todo.date.split("T")[0]
+            : new Date(todo.date).toISOString().split("T")[0],
         duration: todo.duration || "1h",
         completed: todo.completed || false,
         priority: todo.priority || "second",
@@ -154,9 +160,9 @@ const TodoList = ({ navigation }) => {
     } catch (error) {
       console.error("Fetch todos error:", error);
       if (error.response?.status === 401) {
-        await AsyncStorage.removeItem("userToken");
+        await AsyncStorage.removeItem("token");
         Alert.alert("Session Expired", "Please login again.", [
-          { text: "OK", onPress: () => navigation.navigate("Login") },
+          { text: "OK", onPress: () => navigation.replace("Auth") },
         ]);
       } else {
         Alert.alert("Error", "Failed to load todos. Please try again.");
@@ -210,29 +216,37 @@ const TodoList = ({ navigation }) => {
     }
 
     try {
+      setLoading(true);
       const todoData = {
         title: taskTitle.trim(),
         time: formatTime(taskTime),
-        date: selectedDate,
+        date:
+          selectedDate === "all"
+            ? new Date().toISOString().split("T")[0]
+            : selectedDate,
         duration: "1h",
         completed: false,
         priority: taskPriority,
       };
 
-      let response;
       if (editingTask) {
-        response = await updateTodoService(editingTask.id, todoData);
-        if (response && response.data) {
+        const response = await updateTodoService(editingTask.id, todoData);
+        const { todo } = response;
+        
+        if (todo && todo._id) {
           const updatedTask = {
-            id: response.data.id.toString(),
-            title: response.data.title,
-            time: response.data.time,
-            date: response.data.date,
-            duration: response.data.duration || "1h",
-            completed: response.data.completed || false,
-            priority: response.data.priority,
-            color: getPriorityColor(response.data.priority).color,
-            dot: getPriorityColor(response.data.priority).dot,
+            id: todo._id.toString(),
+            title: todo.title,
+            time: todo.time,
+            date:
+              typeof todo.date === "string"
+                ? todo.date.split("T")[0]
+                : new Date(todo.date).toISOString().split("T")[0],
+            duration: todo.duration || "1h",
+            completed: todo.completed || false,
+            priority: todo.priority,
+            color: getPriorityColor(todo.priority).color,
+            dot: getPriorityColor(todo.priority).dot,
           };
           setTaskList((prev) =>
             prev.map((task) =>
@@ -241,18 +255,23 @@ const TodoList = ({ navigation }) => {
           );
         }
       } else {
-        response = await createTodoService(todoData);
-        if (response && response.data) {
+        const response = await createTodoService(todoData);
+        const { todo } = response;
+
+        if (todo && todo._id) {
           const newTask = {
-            id: response.data.id.toString(),
-            title: response.data.title,
-            time: response.data.time,
-            date: response.data.date,
-            duration: response.data.duration || "1h",
-            completed: response.data.completed || false,
-            priority: response.data.priority,
-            color: getPriorityColor(response.data.priority).color,
-            dot: getPriorityColor(response.data.priority).dot,
+            id: todo._id.toString(),
+            title: todo.title,
+            time: todo.time,
+            date:
+              typeof todo.date === "string"
+                ? todo.date.split("T")[0]
+                : new Date(todo.date).toISOString().split("T")[0],
+            duration: todo.duration || "1h",
+            completed: todo.completed || false,
+            priority: todo.priority,
+            color: getPriorityColor(todo.priority).color,
+            dot: getPriorityColor(todo.priority).dot,
           };
           setTaskList((prev) => [...prev, newTask]);
         }
@@ -263,11 +282,13 @@ const TodoList = ({ navigation }) => {
       console.error("Save task error:", error);
       if (error.response?.status === 401) {
         Alert.alert("Session Expired", "Please login again.", [
-          { text: "OK", onPress: () => navigation.navigate("Login") },
+          { text: "OK", onPress: () => navigation.replace("Auth") },
         ]);
       } else {
         Alert.alert("Error", "Failed to save task. Please try again.");
       }
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -279,17 +300,20 @@ const TodoList = ({ navigation }) => {
         style: "destructive",
         onPress: async () => {
           try {
+            setLoading(true);
             await deleteTodoService(id);
             setTaskList((prev) => prev.filter((task) => task.id !== id));
           } catch (error) {
             console.error("Delete task error:", error);
             if (error.response?.status === 401) {
               Alert.alert("Session Expired", "Please login again.", [
-                { text: "OK", onPress: () => navigation.navigate("Login") },
+                { text: "OK", onPress: () => navigation.replace("Auth") },
               ]);
             } else {
               Alert.alert("Error", "Failed to delete task. Please try again.");
             }
+          } finally {
+            setLoading(false);
           }
         },
       },
@@ -301,9 +325,11 @@ const TodoList = ({ navigation }) => {
     if (!task) return;
 
     try {
+      setLoading(true);
       const updateData = { completed: !task.completed };
       const response = await updateTodoService(id, updateData);
-      if (response && response.data) {
+      const success = response.success || response.todo || response;
+      if (success) {
         setTaskList((prev) =>
           prev.map((taskItem) =>
             taskItem.id === id
@@ -315,6 +341,8 @@ const TodoList = ({ navigation }) => {
     } catch (error) {
       console.error("Toggle task complete error:", error);
       Alert.alert("Error", "Failed to update task status. Please try again.");
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -331,8 +359,8 @@ const TodoList = ({ navigation }) => {
         text: "Logout",
         style: "destructive",
         onPress: async () => {
-          await AsyncStorage.removeItem("userToken");
-          navigation.navigate("Login");
+          await AsyncStorage.removeItem("token");
+          navigation.replace("Auth");
         },
       },
     ]);
@@ -405,16 +433,6 @@ const TodoList = ({ navigation }) => {
     </View>
   );
 
-  if (loading && !refreshing) {
-    return (
-      <ScreenWrapper backgroundColor="#0F172A" barStyle="light-content">
-        <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color="#6C7CFF" />
-        </View>
-      </ScreenWrapper>
-    );
-  }
-
   return (
     <ScreenWrapper backgroundColor="#0F172A" barStyle="light-content">
       <View style={styles.container}>
@@ -477,6 +495,10 @@ const TodoList = ({ navigation }) => {
           contentContainerStyle={styles.taskList}
           refreshing={refreshing}
           onRefresh={onRefresh}
+          initialNumToRender={10}
+          maxToRenderPerBatch={10}
+          windowSize={5}
+          removeClippedSubviews={true}
           ListEmptyComponent={
             <View style={styles.emptyContainer}>
               <MaterialIcons name="assignment" size={64} color="#334155" />
@@ -693,12 +715,26 @@ const TodoList = ({ navigation }) => {
           </View>
         </TouchableWithoutFeedback>
       </Modal>
+
+      {/* Loading Overlay */}
+      {loading && !refreshing && (
+        <View style={styles.loadingOverlay}>
+          <LoadingSpinner color="#6C7CFF" size="large" />
+        </View>
+      )}
     </ScreenWrapper>
   );
 };
 export default TodoList;
 
 const styles = StyleSheet.create({
+  loadingOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: "rgba(15, 23, 42, 0.6)",
+    justifyContent: "center",
+    alignItems: "center",
+    zIndex: 999,
+  },
   container: {
     flex: 1,
     paddingHorizontal: 20,

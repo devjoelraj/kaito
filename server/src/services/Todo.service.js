@@ -4,6 +4,10 @@ export const createTodoService = async (todoData) => {
   return await Todo.create(todoData);
 };
 
+export const getTodosService = async (userId) => {
+  return await Todo.find({ user: userId }).sort({ time: 1 });
+};
+
 export const getTodosByDateService = async (userId, date) => {
   const startDate = new Date(date);
 
