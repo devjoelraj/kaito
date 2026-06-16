@@ -176,7 +176,10 @@ const LoginScreen = ({ navigation }) => {
           </TouchableOpacity>
 
           <TouchableOpacity
-            onPress={() => navigation.replace("bottom")}
+            onPress={async () => {
+              await AsyncStorage.removeItem("token");
+              navigation.replace("bottom");
+            }}
             style={styles.demoContainer}
           >
             <Text style={styles.demoLink}>Continue as Demo User</Text>

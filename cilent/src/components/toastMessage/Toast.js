@@ -42,7 +42,7 @@ const CustomToast = () => {
           },
         ]}
       >
-        <AntDesign name="checkcircle" size={20} color="#0F7B0F" />
+        <MaterialCommunityIcons name="check-circle" size={20} color="#0F7B0F" />
         <Text style={[styles.customTipTitle, { color: "#0F7B0F" }]}>
           {text1}
         </Text>

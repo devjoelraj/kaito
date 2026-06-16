@@ -15,6 +15,7 @@ import {
   RefreshControl,
   ActivityIndicator,
 } from "react-native";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 import ScreenWrapper from "../../components/layout/AppWrapper";
 import { LinearGradient } from "expo-linear-gradient";
 import Ionicons from "@expo/vector-icons/Ionicons";
@@ -24,6 +25,7 @@ import {
   showWarningToastMessage,
   showFailureToastMessage,
 } from "../../components/toastMessage/ToastMessageProvider";
+import CustomToast from "../../components/toastMessage/Toast";
 
 const { height } = Dimensions.get("window");
 
@@ -55,7 +57,7 @@ const CATEGORY_CONFIG = {
   Other: { icon: "wallet-outline", color: "#6B7280" },
 };
 
-const Expense = () => {
+const Expense = ({ navigation }) => {
   // State Management
   const [categories, setCategories] = useState([]);
   const [expenses, setExpenses] = useState([]);
@@ -74,6 +76,7 @@ const Expense = () => {
   const [tempBudgetLimit, setTempBudgetLimit] = useState("");
   const [tempCategories, setTempCategories] = useState([]);
   const [isSaving, setIsSaving] = useState(false);
+  const [isAddingExpense, setIsAddingExpense] = useState(false);
 
   // Computed Values
   const totalSpent = useMemo(
@@ -136,6 +139,16 @@ const Expense = () => {
         }
 
         showSuccessToastMessage("Budget data loaded successfully");
+      } else {
+        // No budget data returned from API, load default categories
+        const defaultCategories = Object.keys(CATEGORY_CONFIG).map((catName) => ({
+          name: catName,
+          budget: 0,
+          spent: 0,
+          icon: CATEGORY_CONFIG[catName].icon,
+          color: CATEGORY_CONFIG[catName].color,
+        }));
+        setCategories(defaultCategories);
       }
     } catch (error) {
       console.error("Fetch budget error:", error);
@@ -164,9 +177,28 @@ const Expense = () => {
       return;
     }
 
+    const totalCategoryBudget = tempCategories.reduce((sum, cat) => sum + (parseFloat(cat.budget) || 0), 0);
+    if (totalCategoryBudget > parseFloat(tempBudgetLimit)) {
+      showFailureToastMessage("Category budgets cannot exceed total monthly budget");
+      return;
+    }
+
     setIsSaving(true);
 
     try {
+      const token = await AsyncStorage.getItem("token");
+      console.log("SAVE BUDGET - Current Token:", token);
+
+      if (!token || token === "undefined" || token === "null") {
+        console.log("SAVE BUDGET - No valid token found, saving locally for Demo mode");
+        // Demo mode: simulate save locally
+        setBudgetLimit(parseFloat(tempBudgetLimit));
+        setCategories(tempCategories);
+        setBudgetModalVisible(false);
+        showSuccessToastMessage("Demo: Budget saved locally");
+        return;
+      }
+
       const today = new Date();
       const budgetData = {
         month: today.getMonth() + 1,
@@ -183,9 +215,8 @@ const Expense = () => {
       if (response?.data) {
         setBudgetLimit(parseFloat(tempBudgetLimit));
         setCategories(tempCategories);
-        showSuccessToastMessage("Budget saved successfully", () =>
-          setBudgetModalVisible(false),
-        );
+        setBudgetModalVisible(false);
+        showSuccessToastMessage("Budget saved successfully");
       }
     } catch (error) {
       console.error("Save budget error:", error);
@@ -215,21 +246,27 @@ const Expense = () => {
       return;
     }
 
-    const newExpense = {
-      id: Date.now().toString(),
-      title: title.trim(),
-      category,
-      amount: parseFloat(amount),
-      date: "Today",
-      icon: selectedCat.icon,
-      color: selectedCat.color,
-    };
+    setIsAddingExpense(true);
 
-    setExpenses((prev) => [newExpense, ...prev]);
-    setTitle("");
-    setAmount("");
-    setModalVisible(false);
-    showSuccessToastMessage("Expense added successfully");
+    // Simulate small delay for UI feedback
+    setTimeout(() => {
+      const newExpense = {
+        id: Date.now().toString(),
+        title: title.trim(),
+        category,
+        amount: parseFloat(amount),
+        date: "Today",
+        icon: selectedCat.icon,
+        color: selectedCat.color,
+      };
+
+      setExpenses((prev) => [newExpense, ...prev]);
+      setTitle("");
+      setAmount("");
+      setModalVisible(false);
+      showSuccessToastMessage("Expense added successfully");
+      setIsAddingExpense(false);
+    }, 400);
   }, [title, amount, category, categories]);
 
   // Open budget modal
@@ -374,10 +411,17 @@ const Expense = () => {
           </View>
 
           {/* EXPENSES */}
-          <Text style={styles.sectionTitle}>Recent Expenses</Text>
+          <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
+            <Text style={[styles.sectionTitle, { marginBottom: 0 }]}>Recent Expenses</Text>
+            {expenses.length > 3 && (
+              <TouchableOpacity onPress={() => navigation.navigate("ExpenseList", { expenses })}>
+                <Ionicons name="chevron-forward" size={24} color="#6366F1" />
+              </TouchableOpacity>
+            )}
+          </View>
           <View style={styles.expensesList}>
             {expenses.length > 0 ? (
-              expenses.map((exp) => (
+              expenses.slice(0, 3).map((exp) => (
                 <View key={exp.id} style={styles.expenseItem}>
                   <View
                     style={[
@@ -536,15 +580,21 @@ const Expense = () => {
                 <TouchableOpacity
                   style={styles.submitBtn}
                   onPress={handleAddExpense}
+                  disabled={isAddingExpense}
                 >
                   <LinearGradient
                     colors={["#6366F1", "#A855F7"]}
                     style={styles.submitBtnGradient}
                   >
-                    <Text style={styles.submitBtnText}>Add Expense</Text>
+                    {isAddingExpense ? (
+                      <ActivityIndicator color="#FFFFFF" />
+                    ) : (
+                      <Text style={styles.submitBtnText}>Add Expense</Text>
+                    )}
                   </LinearGradient>
                 </TouchableOpacity>
               </View>
+              <CustomToast />
             </KeyboardAvoidingView>
           </View>
         </TouchableWithoutFeedback>
@@ -631,6 +681,7 @@ const Expense = () => {
                   </LinearGradient>
                 </TouchableOpacity>
               </View>
+              <CustomToast />
             </KeyboardAvoidingView>
           </View>
         </TouchableWithoutFeedback>
@@ -757,7 +808,8 @@ const styles = StyleSheet.create({
     color: "#FFFFFF",
     marginBottom: 16,
   },
-
+  loadingContainer: { flex: 1, justifyContent: "center", alignItems: "center" },
+  loadingText: { marginTop: 12, color: "#FFFFFF", fontSize: 16 },
   chartCard: {
     backgroundColor: "rgba(30,41,59,0.3)",
     borderRadius: 24,

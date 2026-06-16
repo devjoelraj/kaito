@@ -21,4 +21,18 @@ apiClient.interceptors.request.use(
   }
 );
 
+apiClient.interceptors.response.use(
+  (response) => {
+    return response;
+  },
+  async (error) => {
+    if (error.response && error.response.status === 401) {
+      // Token is invalid or expired, clear it
+      await AsyncStorage.removeItem("token");
+      console.log("Interceptor: 401 Unauthorized, token cleared from storage");
+    }
+    return Promise.reject(error);
+  }
+);
+
 export default apiClient;

@@ -2,7 +2,7 @@ import apiClient from "./apiClient";
 
 export const saveBudgetService = async (budgetData) => {
   try {
-    const response = await apiClient.post("/budget", budgetData);
+    const response = await apiClient.post("/expenses", budgetData);
 
     if (response.status === 200) {
       return response.data;
@@ -15,7 +15,7 @@ export const saveBudgetService = async (budgetData) => {
 
 export const getBudgetService = async (month, year) => {
   try {
-    const response = await apiClient.get(`/budget?month=${month}&year=${year}`);
+    const response = await apiClient.get(`/expenses?month=${month}&year=${year}`);
 
     if (response.status === 200) {
       return response.data;
