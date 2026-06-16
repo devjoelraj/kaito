@@ -1,13 +1,17 @@
 import React from "react";
-import { Text, View, StyleSheet } from "react-native";
-import SafeScreen from "./src/components/layout/AppWrapper";
-import AppNavigation from "./src/navigation/AppNavigation";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
+import { SafeAreaProvider } from "react-native-safe-area-context";
+
+import AppNavigation from "./src/navigation/AppNavigation";
+import CustomToast from "./src/components/toastMessage/Toast";
 
 export default function App() {
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
-      <AppNavigation />
+      <SafeAreaProvider>
+        <CustomToast />
+        <AppNavigation />
+      </SafeAreaProvider>
     </GestureHandlerRootView>
   );
 }

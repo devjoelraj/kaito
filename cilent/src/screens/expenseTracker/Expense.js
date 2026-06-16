@@ -1,5 +1,4 @@
-import React, { useState } from "react";
-
+import React, { useEffect, useState, useCallback, useMemo } from "react";
 import {
   View,
   Text,
@@ -13,117 +12,212 @@ import {
   Platform,
   TouchableWithoutFeedback,
   Keyboard,
+  RefreshControl,
+  ActivityIndicator,
 } from "react-native";
-
 import ScreenWrapper from "../../components/layout/AppWrapper";
-
 import { LinearGradient } from "expo-linear-gradient";
-
 import Ionicons from "@expo/vector-icons/Ionicons";
+import { getBudgetService, saveBudgetService } from "../../api/expenseService";
+import {
+  showSuccessToastMessage,
+  showWarningToastMessage,
+  showFailureToastMessage,
+} from "../../components/toastMessage/ToastMessageProvider";
 
 const { height } = Dimensions.get("window");
 
-const Monthly_DATA = [
-  { day: "jan", amount: 45 },
-  { day: "feb", amount: 75 },
-  { day: "mar", amount: 120, isToday: true },
-  { day: "apr", amount: 30 },
-  { day: "may", amount: 60 },
-  { day: "jun", amount: 95 },
-  { day: "jul", amount: 15 },
+const MONTHS = [
+  "jan",
+  "feb",
+  "mar",
+  "apr",
+  "may",
+  "jun",
+  "jul",
+  "aug",
+  "sep",
+  "oct",
+  "nov",
+  "dec",
 ];
+const MAX_CHART_VALUE = 130;
+
+// Category configurations
+const CATEGORY_CONFIG = {
+  "Food & Drinks": { icon: "fast-food-outline", color: "#F59E0B" },
+  Shopping: { icon: "basket-outline", color: "#EC4899" },
+  Transport: { icon: "car-outline", color: "#3B82F6" },
+  Entertainment: { icon: "play-circle-outline", color: "#EF4444" },
+  Utilities: { icon: "flash-outline", color: "#A855F7" },
+  Health: { icon: "medkit-outline", color: "#10B981" },
+  Education: { icon: "school-outline", color: "#6366F1" },
+  Other: { icon: "wallet-outline", color: "#6B7280" },
+};
 
 const Expense = () => {
-  const [categories, setCategories] = useState([
-    {
-      name: "Food & Drinks",
-      icon: "fast-food-outline",
-      color: "#F59E0B",
-      budget: 400,
-    },
-    {
-      name: "Shopping",
-      icon: "basket-outline",
-      color: "#EC4899",
-      budget: 300,
-    },
-    {
-      name: "Transport",
-      icon: "car-outline",
-      color: "#3B82F6",
-      budget: 200,
-    },
-    {
-      name: "Entertainment",
-      icon: "play-circle-outline",
-      color: "#EF4444",
-      budget: 150,
-    },
-    {
-      name: "Utilities",
-      icon: "flash-outline",
-      color: "#A855F7",
-      budget: 250,
-    },
-  ]);
-
-  const [expenses, setExpenses] = useState([
-    {
-      id: "1",
-      title: "Grocery Shopping",
-      category: "Food & Drinks",
-      amount: 84.5,
-      date: "Today",
-      icon: "fast-food-outline",
-      color: "#F59E0B",
-    },
-    {
-      id: "2",
-      title: "New Sneakers",
-      category: "Shopping",
-      amount: 120,
-      date: "Yesterday",
-      icon: "basket-outline",
-      color: "#EC4899",
-    },
-    {
-      id: "3",
-      title: "Electricity Bill",
-      category: "Utilities",
-      amount: 112.4,
-      date: "May 15",
-      icon: "flash-outline",
-      color: "#A855F7",
-    },
-  ]);
-
+  // State Management
+  const [categories, setCategories] = useState([]);
+  const [expenses, setExpenses] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
   const [modalVisible, setModalVisible] = useState(false);
-
   const [budgetModalVisible, setBudgetModalVisible] = useState(false);
 
+  // Form States
   const [title, setTitle] = useState("");
   const [amount, setAmount] = useState("");
   const [category, setCategory] = useState("Food & Drinks");
 
-  const [budgetLimit, setBudgetLimit] = useState(1300);
-
-  const [tempBudgetLimit, setTempBudgetLimit] = useState("1300");
-
+  // Budget States
+  const [budgetLimit, setBudgetLimit] = useState(0);
+  const [tempBudgetLimit, setTempBudgetLimit] = useState("");
   const [tempCategories, setTempCategories] = useState([]);
+  const [isSaving, setIsSaving] = useState(false);
 
-  const totalSpent = expenses.reduce((sum, item) => sum + item.amount, 0);
+  // Computed Values
+  const totalSpent = useMemo(
+    () => expenses.reduce((sum, item) => sum + item.amount, 0),
+    [expenses],
+  );
 
-  const budgetProgress = budgetLimit > 0 ? totalSpent / budgetLimit : 0;
+  const budgetProgress = useMemo(
+    () => (budgetLimit > 0 ? totalSpent / budgetLimit : 0),
+    [budgetLimit, totalSpent],
+  );
 
-  const handleAddExpense = () => {
-    if (!title || !amount) return;
+  // Monthly chart data generator
+  const monthlyData = useMemo(() => {
+    const currentMonth = new Date().getMonth();
+    return MONTHS.map((month, index) => ({
+      day: month,
+      amount: Math.floor(Math.random() * 120) + 10,
+      isToday: index === currentMonth,
+    }));
+  }, []);
 
-    const selectedCat =
-      categories.find((c) => c.name === category) || categories[0];
+  // Fetch budget data
+  const fetchBudget = useCallback(async () => {
+    try {
+      const today = new Date();
+      const response = await getBudgetService(
+        today.getMonth() + 1,
+        today.getFullYear(),
+      );
+
+      if (response?.data) {
+        const budgetData = response.data;
+        setBudgetLimit(budgetData.monthlyLimit || 0);
+
+        const mappedCategories = (budgetData.categories || []).map((item) => ({
+          name: item.category,
+          budget: item.limit || 0,
+          spent: item.spent || 0,
+          icon: CATEGORY_CONFIG[item.category]?.icon || "wallet-outline",
+          color: CATEGORY_CONFIG[item.category]?.color || "#6366F1",
+        }));
+
+        if (mappedCategories.length === 0) {
+          mappedCategories.push(
+            ...Object.keys(CATEGORY_CONFIG).map((catName) => ({
+              name: catName,
+              budget: 0,
+              spent: 0,
+              icon: CATEGORY_CONFIG[catName].icon,
+              color: CATEGORY_CONFIG[catName].color,
+            })),
+          );
+        }
+
+        setCategories(mappedCategories);
+
+        if (budgetData.expenses) {
+          setExpenses(budgetData.expenses);
+        }
+
+        showSuccessToastMessage("Budget data loaded successfully");
+      }
+    } catch (error) {
+      console.error("Fetch budget error:", error);
+
+      const defaultCategories = Object.keys(CATEGORY_CONFIG).map((catName) => ({
+        name: catName,
+        budget: 0,
+        spent: 0,
+        icon: CATEGORY_CONFIG[catName].icon,
+        color: CATEGORY_CONFIG[catName].color,
+      }));
+      setCategories(defaultCategories);
+
+      showFailureToastMessage(
+        error.response?.data?.message || "Failed to load budget data",
+      );
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  // Save budget
+  const handleSaveBudget = useCallback(async () => {
+    if (!tempBudgetLimit || parseFloat(tempBudgetLimit) <= 0) {
+      showFailureToastMessage("Please enter a valid budget limit");
+      return;
+    }
+
+    setIsSaving(true);
+
+    try {
+      const today = new Date();
+      const budgetData = {
+        month: today.getMonth() + 1,
+        year: today.getFullYear(),
+        monthlyLimit: parseFloat(tempBudgetLimit),
+        categories: tempCategories.map((cat) => ({
+          category: cat.name,
+          limit: cat.budget || 0,
+        })),
+      };
+
+      const response = await saveBudgetService(budgetData);
+
+      if (response?.data) {
+        setBudgetLimit(parseFloat(tempBudgetLimit));
+        setCategories(tempCategories);
+        showSuccessToastMessage("Budget saved successfully", () =>
+          setBudgetModalVisible(false),
+        );
+      }
+    } catch (error) {
+      console.error("Save budget error:", error);
+      showFailureToastMessage(
+        error.response?.data?.message || "Failed to save budget",
+      );
+    } finally {
+      setIsSaving(false);
+    }
+  }, [tempBudgetLimit, tempCategories]);
+
+  // Add expense
+  const handleAddExpense = useCallback(async () => {
+    if (!title.trim()) {
+      showFailureToastMessage("Please enter expense title");
+      return;
+    }
+
+    if (!amount || parseFloat(amount) <= 0) {
+      showFailureToastMessage("Please enter a valid amount");
+      return;
+    }
+
+    const selectedCat = categories.find((c) => c.name === category);
+    if (!selectedCat) {
+      showFailureToastMessage("Please select a category");
+      return;
+    }
 
     const newExpense = {
       id: Date.now().toString(),
-      title,
+      title: title.trim(),
       category,
       amount: parseFloat(amount),
       date: "Today",
@@ -131,13 +225,51 @@ const Expense = () => {
       color: selectedCat.color,
     };
 
-    setExpenses([newExpense, ...expenses]);
-
+    setExpenses((prev) => [newExpense, ...prev]);
     setTitle("");
     setAmount("");
-
     setModalVisible(false);
-  };
+    showSuccessToastMessage("Expense added successfully");
+  }, [title, amount, category, categories]);
+
+  // Open budget modal
+  const openBudgetModal = useCallback(() => {
+    setTempBudgetLimit(budgetLimit.toString());
+    setTempCategories(JSON.parse(JSON.stringify(categories)));
+    setBudgetModalVisible(true);
+  }, [budgetLimit, categories]);
+
+  // Refresh data
+  const onRefresh = useCallback(async () => {
+    setRefreshing(true);
+    await fetchBudget();
+    setRefreshing(false);
+  }, [fetchBudget]);
+
+  // Get category spent amount
+  const getCategorySpent = useCallback(
+    (categoryName) => {
+      return expenses
+        .filter((e) => e.category === categoryName)
+        .reduce((sum, item) => sum + item.amount, 0);
+    },
+    [expenses],
+  );
+
+  useEffect(() => {
+    fetchBudget();
+  }, [fetchBudget]);
+
+  if (loading) {
+    return (
+      <ScreenWrapper backgroundColor="#0F172A" barStyle="light-content">
+        <View style={styles.loadingContainer}>
+          <ActivityIndicator size="large" color="#6366F1" />
+          <Text style={styles.loadingText}>Loading expenses...</Text>
+        </View>
+      </ScreenWrapper>
+    );
+  }
 
   return (
     <ScreenWrapper backgroundColor="#0F172A" barStyle="light-content">
@@ -145,13 +277,14 @@ const Expense = () => {
         showsVerticalScrollIndicator={false}
         keyboardShouldPersistTaps="handled"
         contentContainerStyle={styles.scrollContent}
+        refreshControl={
+          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
+        }
       >
         <View style={styles.container}>
           {/* HEADER */}
-
           <View style={styles.header}>
             <Text style={styles.headerTitle}>Expense Tracker</Text>
-
             <TouchableOpacity
               style={styles.addButton}
               activeOpacity={0.8}
@@ -169,66 +302,48 @@ const Expense = () => {
           </View>
 
           {/* BUDGET CARD */}
+          <TouchableOpacity activeOpacity={0.7} onPress={openBudgetModal}>
+            <View style={styles.budgetCard}>
+              <View style={styles.budgetHeader}>
+                <View>
+                  <Text style={styles.budgetLabel}>MONTHLY BUDGET LIMIT</Text>
+                  <Text style={styles.budgetLimitText}>
+                    ${budgetLimit.toFixed(2)}
+                  </Text>
+                </View>
+                <View style={styles.spentBadge}>
+                  <Text style={styles.spentBadgeText}>
+                    {Math.round(budgetProgress * 100)}% Spent
+                  </Text>
+                </View>
+              </View>
 
-          <View style={styles.budgetCard}>
-            <View style={styles.budgetHeader}>
-              <TouchableOpacity
-                activeOpacity={0.7}
-                onPress={() => {
-                  setTempBudgetLimit(budgetLimit.toString());
+              <View style={styles.progressBarBg}>
+                <View
+                  style={[
+                    styles.progressBarFill,
+                    { width: `${Math.min(budgetProgress * 100, 100)}%` },
+                  ]}
+                />
+              </View>
 
-                  setTempCategories(JSON.parse(JSON.stringify(categories)));
-
-                  setBudgetModalVisible(true);
-                }}
-              >
-                <Text style={styles.budgetLabel}>MONTHLY BUDGET LIMIT</Text>
-
-                <Text style={styles.budgetLimitText}>
-                  ${budgetLimit.toFixed(2)}
+              <View style={styles.budgetFooter}>
+                <Text style={styles.spentText}>
+                  Spent: ${totalSpent.toFixed(2)}
                 </Text>
-              </TouchableOpacity>
-
-              <View style={styles.spentBadge}>
-                <Text style={styles.spentBadgeText}>
-                  {Math.round(budgetProgress * 100)}% Spent
+                <Text style={styles.remainingText}>
+                  Remaining: ${(budgetLimit - totalSpent).toFixed(2)}
                 </Text>
               </View>
             </View>
-
-            <View style={styles.progressBarBg}>
-              <View
-                style={[
-                  styles.progressBarFill,
-                  {
-                    width: `${Math.min(budgetProgress * 100, 100)}%`,
-                  },
-                ]}
-              />
-            </View>
-
-            <View style={styles.budgetFooter}>
-              <Text style={styles.spentText}>
-                Spent: ${totalSpent.toFixed(2)}
-              </Text>
-
-              <Text style={styles.remainingText}>
-                Remaining: ${(budgetLimit - totalSpent).toFixed(2)}
-              </Text>
-            </View>
-          </View>
+          </TouchableOpacity>
 
           {/* CHART */}
-
           <Text style={styles.sectionTitle}>Monthly Activity</Text>
-
           <View style={styles.chartCard}>
             <View style={styles.chartContainer}>
-              {Monthly_DATA.map((item, index) => {
-                const maxVal = 130;
-
-                const pct = (item.amount / maxVal) * 100;
-
+              {monthlyData.map((item, index) => {
+                const pct = (item.amount / MAX_CHART_VALUE) * 100;
                 return (
                   <View key={index} style={styles.chartBarWrapper}>
                     <View style={styles.chartTrack}>
@@ -244,7 +359,6 @@ const Expense = () => {
                         ]}
                       />
                     </View>
-
                     <Text
                       style={[
                         styles.chartDayLabel,
@@ -260,64 +374,56 @@ const Expense = () => {
           </View>
 
           {/* EXPENSES */}
-
-          <Text style={styles.sectionTitle}>Expense Logs</Text>
-
+          <Text style={styles.sectionTitle}>Recent Expenses</Text>
           <View style={styles.expensesList}>
-            {expenses.map((exp) => (
-              <View key={exp.id} style={styles.expenseItem}>
-                <View
-                  style={[
-                    styles.expenseIconWrapper,
-                    {
-                      backgroundColor: `${exp.color}15`,
-                    },
-                  ]}
-                >
-                  <Ionicons name={exp.icon} size={20} color={exp.color} />
-                </View>
-
-                <View style={styles.expenseDetails}>
-                  <Text style={styles.expenseTitle}>{exp.title}</Text>
-
-                  <Text style={styles.expenseMeta}>
-                    {exp.category} • {exp.date}
+            {expenses.length > 0 ? (
+              expenses.map((exp) => (
+                <View key={exp.id} style={styles.expenseItem}>
+                  <View
+                    style={[
+                      styles.expenseIconWrapper,
+                      { backgroundColor: `${exp.color}15` },
+                    ]}
+                  >
+                    <Ionicons name={exp.icon} size={20} color={exp.color} />
+                  </View>
+                  <View style={styles.expenseDetails}>
+                    <Text style={styles.expenseTitle}>{exp.title}</Text>
+                    <Text style={styles.expenseMeta}>
+                      {exp.category} • {exp.date}
+                    </Text>
+                  </View>
+                  <Text style={styles.expenseAmount}>
+                    -${exp.amount.toFixed(2)}
                   </Text>
                 </View>
-
-                <Text style={styles.expenseAmount}>
-                  -${exp.amount.toFixed(2)}
-                </Text>
+              ))
+            ) : (
+              <View style={styles.emptyState}>
+                <Ionicons name="receipt-outline" size={48} color="#334155" />
+                <Text style={styles.emptyStateText}>No expenses yet</Text>
               </View>
-            ))}
+            )}
           </View>
 
           {/* CATEGORY BUDGETS */}
-
           <Text style={styles.sectionTitle}>Budgets by Category</Text>
-
           <View style={styles.categoriesCard}>
             {categories.map((cat, idx) => {
-              const currentSpent = expenses
-                .filter((e) => e.category === cat.name)
-                .reduce((sum, item) => sum + item.amount, 0);
-
-              const catProgress = currentSpent / cat.budget;
-
+              const currentSpent = getCategorySpent(cat.name);
+              const catProgress =
+                cat.budget > 0 ? currentSpent / cat.budget : 0;
               return (
                 <View key={idx} style={styles.categoryProgressRow}>
                   <View style={styles.catRowHeader}>
                     <View style={styles.catNameContainer}>
                       <Ionicons name={cat.icon} size={18} color={cat.color} />
-
                       <Text style={styles.catName}>{cat.name}</Text>
                     </View>
-
                     <Text style={styles.catSpendText}>
                       ${currentSpent.toFixed(0)} / ${cat.budget}
                     </Text>
                   </View>
-
                   <View style={styles.catProgressBarBg}>
                     <View
                       style={[
@@ -337,7 +443,6 @@ const Expense = () => {
       </ScrollView>
 
       {/* ADD EXPENSE MODAL */}
-
       <Modal
         transparent
         animationType="slide"
@@ -347,13 +452,12 @@ const Expense = () => {
         <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
           <View style={styles.modalOverlay}>
             <KeyboardAvoidingView
-              behavior={Platform.OS === "ios" ? "padding" : undefined}
-              style={{ width: "100%" }}
+              behavior={Platform.OS === "ios" ? "padding" : "height"}
+              style={styles.modalContainer}
             >
               <View style={styles.modalContent}>
                 <View style={styles.modalHeader}>
                   <Text style={styles.modalTitle}>Add New Expense</Text>
-
                   <TouchableOpacity onPress={() => setModalVisible(false)}>
                     <Ionicons name="close" size={24} color="#94A3B8" />
                   </TouchableOpacity>
@@ -365,24 +469,23 @@ const Expense = () => {
                 >
                   <View style={styles.formGroup}>
                     <Text style={styles.formLabel}>Title</Text>
-
                     <TextInput
                       style={styles.modalInput}
                       placeholder="Expense title"
                       placeholderTextColor="#64748B"
                       value={title}
                       onChangeText={setTitle}
+                      maxLength={50}
                     />
                   </View>
 
                   <View style={styles.formGroup}>
-                    <Text style={styles.formLabel}>Amount</Text>
-
+                    <Text style={styles.formLabel}>Amount ($)</Text>
                     <TextInput
                       style={styles.modalInput}
                       placeholder="0.00"
                       placeholderTextColor="#64748B"
-                      keyboardType="numeric"
+                      keyboardType="decimal-pad"
                       value={amount}
                       onChangeText={setAmount}
                     />
@@ -390,42 +493,43 @@ const Expense = () => {
 
                   <View style={styles.formGroup}>
                     <Text style={styles.formLabel}>Category</Text>
-
-                    <View style={styles.categoryPicker}>
-                      {categories.map((cat, idx) => (
-                        <TouchableOpacity
-                          key={idx}
-                          style={[
-                            styles.categoryOption,
-                            category === cat.name &&
-                              styles.categoryOptionSelected,
-                            category === cat.name && {
-                              borderColor: cat.color,
-                            },
-                          ]}
-                          onPress={() => setCategory(cat.name)}
-                        >
-                          <Ionicons
-                            name={cat.icon}
-                            size={18}
-                            color={
-                              category === cat.name ? cat.color : "#94A3B8"
-                            }
-                          />
-
-                          <Text
+                    <ScrollView
+                      horizontal
+                      showsHorizontalScrollIndicator={false}
+                    >
+                      <View style={styles.categoryPicker}>
+                        {categories.map((cat, idx) => (
+                          <TouchableOpacity
+                            key={idx}
                             style={[
-                              styles.categoryOptionText,
+                              styles.categoryOption,
+                              category === cat.name &&
+                                styles.categoryOptionSelected,
                               category === cat.name && {
-                                color: "#FFFFFF",
+                                borderColor: cat.color,
                               },
                             ]}
+                            onPress={() => setCategory(cat.name)}
                           >
-                            {cat.name}
-                          </Text>
-                        </TouchableOpacity>
-                      ))}
-                    </View>
+                            <Ionicons
+                              name={cat.icon}
+                              size={18}
+                              color={
+                                category === cat.name ? cat.color : "#94A3B8"
+                              }
+                            />
+                            <Text
+                              style={[
+                                styles.categoryOptionText,
+                                category === cat.name && { color: "#FFFFFF" },
+                              ]}
+                            >
+                              {cat.name}
+                            </Text>
+                          </TouchableOpacity>
+                        ))}
+                      </View>
+                    </ScrollView>
                   </View>
                 </ScrollView>
 
@@ -447,7 +551,6 @@ const Expense = () => {
       </Modal>
 
       {/* BUDGET MODAL */}
-
       <Modal
         transparent
         animationType="slide"
@@ -457,13 +560,12 @@ const Expense = () => {
         <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
           <View style={styles.modalOverlay}>
             <KeyboardAvoidingView
-              behavior={Platform.OS === "ios" ? "padding" : undefined}
-              style={{ width: "100%" }}
+              behavior={Platform.OS === "ios" ? "padding" : "height"}
+              style={styles.modalContainer}
             >
               <View style={styles.modalContent}>
                 <View style={styles.modalHeader}>
                   <Text style={styles.modalTitle}>Set Monthly Budget</Text>
-
                   <TouchableOpacity
                     onPress={() => setBudgetModalVisible(false)}
                   >
@@ -475,41 +577,36 @@ const Expense = () => {
                   nestedScrollEnabled
                   keyboardShouldPersistTaps="handled"
                   showsVerticalScrollIndicator={false}
-                  contentContainerStyle={{
-                    paddingBottom: 30,
-                  }}
                 >
                   <View style={styles.formGroup}>
                     <Text style={styles.formLabel}>Overall Budget</Text>
-
                     <TextInput
                       style={styles.modalInput}
-                      placeholder="1500"
+                      placeholder="Enter total budget"
                       placeholderTextColor="#64748B"
-                      keyboardType="numeric"
+                      keyboardType="decimal-pad"
                       value={tempBudgetLimit}
                       onChangeText={setTempBudgetLimit}
                     />
                   </View>
 
-                  <Text style={styles.sectionTitle}>Category Budgets</Text>
-
+                  <Text style={styles.subSectionTitle}>Category Budgets</Text>
                   {tempCategories.map((cat, idx) => (
                     <View key={idx} style={styles.formGroup}>
-                      <Text style={styles.formLabel}>{cat.name}</Text>
-
+                      <Text style={styles.formLabel}>
+                        <Ionicons name={cat.icon} size={14} color={cat.color} />{" "}
+                        {cat.name}
+                      </Text>
                       <TextInput
                         style={styles.modalInput}
-                        keyboardType="numeric"
-                        placeholder="0"
+                        keyboardType="decimal-pad"
+                        placeholder="Enter category budget"
                         placeholderTextColor="#64748B"
                         value={cat.budget ? cat.budget.toString() : ""}
                         onChangeText={(val) => {
                           const newCats = [...tempCategories];
-
                           newCats[idx].budget =
                             val === "" ? 0 : parseFloat(val);
-
                           setTempCategories(newCats);
                         }}
                       />
@@ -519,19 +616,18 @@ const Expense = () => {
 
                 <TouchableOpacity
                   style={styles.submitBtn}
-                  onPress={() => {
-                    setBudgetLimit(parseFloat(tempBudgetLimit) || 0);
-
-                    setCategories(tempCategories);
-
-                    setBudgetModalVisible(false);
-                  }}
+                  onPress={handleSaveBudget}
+                  disabled={isSaving}
                 >
                   <LinearGradient
                     colors={["#6366F1", "#A855F7"]}
                     style={styles.submitBtnGradient}
                   >
-                    <Text style={styles.submitBtnText}>Save Budgets</Text>
+                    {isSaving ? (
+                      <ActivityIndicator color="#FFFFFF" />
+                    ) : (
+                      <Text style={styles.submitBtnText}>Save Budgets</Text>
+                    )}
                   </LinearGradient>
                 </TouchableOpacity>
               </View>
@@ -655,6 +751,12 @@ const styles = StyleSheet.create({
     color: "#FFFFFF",
     marginBottom: 16,
   },
+  subSectionTitle: {
+    fontSize: 18,
+    fontWeight: "700",
+    color: "#FFFFFF",
+    marginBottom: 16,
+  },
 
   chartCard: {
     backgroundColor: "rgba(30,41,59,0.3)",
@@ -719,7 +821,17 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     alignItems: "center",
   },
+  emptyState: {
+    flex: 1,
+    alignItems: "center",
+    justifyContent: "space-between",
+  },
 
+  emptyStateText: {
+    fontSize: 14,
+    fontWeight: "700",
+    color: "#FFFFFF",
+  },
   expenseDetails: {
     flex: 1,
     marginLeft: 12,

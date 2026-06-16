@@ -232,7 +232,7 @@ const TodoList = ({ navigation }) => {
       if (editingTask) {
         const response = await updateTodoService(editingTask.id, todoData);
         const { todo } = response;
-        
+
         if (todo && todo._id) {
           const updatedTask = {
             id: todo._id.toString(),
@@ -352,20 +352,6 @@ const TodoList = ({ navigation }) => {
     setRefreshing(false);
   };
 
-  const handleLogout = async () => {
-    Alert.alert("Logout", "Are you sure you want to logout?", [
-      { text: "Cancel", style: "cancel" },
-      {
-        text: "Logout",
-        style: "destructive",
-        onPress: async () => {
-          await AsyncStorage.removeItem("token");
-          navigation.replace("Auth");
-        },
-      },
-    ]);
-  };
-
   const filteredTasks =
     selectedDate === "all"
       ? taskList
@@ -443,9 +429,6 @@ const TodoList = ({ navigation }) => {
               {currentDate} {currentMonth}
             </Text>
           </Text>
-          <TouchableOpacity onPress={handleLogout} style={styles.logoutButton}>
-            <MaterialIcons name="logout" size={24} color="#94A3B8" />
-          </TouchableOpacity>
         </View>
 
         <FlatList
