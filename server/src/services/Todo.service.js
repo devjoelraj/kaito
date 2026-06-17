@@ -43,3 +43,19 @@ export const deleteTodoService = async (todoId, userId) => {
     user: userId,
   });
 };
+
+export const getOtherTodosService = async (userId, startDateStr, endDateStr) => {
+  const startDate = new Date(startDateStr);
+  startDate.setHours(0, 0, 0, 0);
+
+  const endDate = new Date(endDateStr);
+  endDate.setHours(23, 59, 59, 999);
+
+  return await Todo.find({
+    user: userId,
+    $or: [
+      { date: { $lt: startDate } },
+      { date: { $gt: endDate } }
+    ]
+  }).sort({ date: 1, time: 1 });
+};

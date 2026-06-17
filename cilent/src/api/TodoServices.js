@@ -64,3 +64,16 @@ export const deleteTodoService = async (id) => {
     throw error;
   }
 };
+
+export const getOtherTodosAPI = async (startDate, endDate) => {
+  try {
+    const response = await apiClient.get(`/todos/other?startDate=${startDate}&endDate=${endDate}`);
+
+    if (response.status === 200) {
+      return response.data;
+    }
+  } catch (error) {
+    console.error("Get Other Todos Error:", error);
+    throw error;
+  }
+};

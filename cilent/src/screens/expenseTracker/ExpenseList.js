@@ -1,10 +1,55 @@
-import React from "react";
-import { View, Text, StyleSheet, FlatList, TouchableOpacity } from "react-native";
+import React, { useState, useEffect, useCallback } from "react";
+import { View, Text, StyleSheet, FlatList, TouchableOpacity, ScrollView, ActivityIndicator } from "react-native";
 import Ionicons from "@expo/vector-icons/Ionicons";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 import ScreenWrapper from "../../components/layout/AppWrapper";
+import { getExpensesByMonthService } from "../../api/expenseService";
+
+const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
 
 const ExpenseList = ({ route, navigation }) => {
-  const { expenses = [] } = route.params || {};
+  const initialExpenses = route.params?.expenses || [];
+  
+  const today = new Date();
+  const [selectedMonth, setSelectedMonth] = useState(today.getMonth() + 1); // 1-12
+  const [selectedYear, setSelectedYear] = useState(today.getFullYear());
+  
+  const [expenses, setExpenses] = useState(initialExpenses);
+  const [loading, setLoading] = useState(false);
+
+  const fetchExpenses = useCallback(async (month, year) => {
+    setLoading(true);
+    try {
+      const token = await AsyncStorage.getItem("token");
+      if (!token || token === "undefined" || token === "null") {
+        // Demo mode: just show initial expenses if month matches current month, else empty
+        if (month === today.getMonth() + 1 && year === today.getFullYear()) {
+          setExpenses(initialExpenses);
+        } else {
+          setExpenses([]);
+        }
+        setLoading(false);
+        return;
+      }
+
+      const response = await getExpensesByMonthService(month, year);
+      if (response?.data) {
+        setExpenses(response.data);
+      } else {
+        setExpenses([]);
+      }
+    } catch (error) {
+      console.error("Failed to fetch expenses:", error);
+      setExpenses([]);
+    } finally {
+      setLoading(false);
+    }
+  }, [initialExpenses]);
+
+  // Refetch when month/year changes
+  useEffect(() => {
+    fetchExpenses(selectedMonth, selectedYear);
+  }, [selectedMonth, selectedYear, fetchExpenses]);
 
   return (
     <ScreenWrapper backgroundColor="#0F172A" barStyle="light-content">
@@ -16,34 +61,61 @@ const ExpenseList = ({ route, navigation }) => {
         <View style={{ width: 24 }} />
       </View>
 
-      <FlatList
-        data={expenses}
-        keyExtractor={(item) => item.id}
-        contentContainerStyle={styles.listContainer}
-        showsVerticalScrollIndicator={false}
-        renderItem={({ item: exp }) => (
-          <View style={styles.expenseItem}>
-            <View style={[styles.expenseIconWrapper, { backgroundColor: `${exp.color}15` }]}>
-              <Ionicons name={exp.icon} size={20} color={exp.color} />
-            </View>
-            <View style={styles.expenseDetails}>
-              <Text style={styles.expenseTitle}>{exp.title}</Text>
-              <Text style={styles.expenseMeta}>
-                {exp.category} • {exp.date}
+      {/* Month Selector Dropdown / Scroller */}
+      <View style={styles.monthSelectorContainer}>
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.monthScroll}>
+          {MONTHS.map((monthStr, index) => {
+            const monthNum = index + 1;
+            const isSelected = monthNum === selectedMonth;
+            return (
+              <TouchableOpacity
+                key={monthStr}
+                style={[styles.monthPill, isSelected && styles.monthPillActive]}
+                onPress={() => setSelectedMonth(monthNum)}
+              >
+                <Text style={[styles.monthPillText, isSelected && styles.monthPillTextActive]}>
+                  {monthStr}
+                </Text>
+              </TouchableOpacity>
+            );
+          })}
+        </ScrollView>
+      </View>
+
+      {loading ? (
+        <View style={styles.loadingContainer}>
+          <ActivityIndicator size="large" color="#6366F1" />
+        </View>
+      ) : (
+        <FlatList
+          data={expenses}
+          keyExtractor={(item) => item.id || item._id}
+          contentContainerStyle={styles.listContainer}
+          showsVerticalScrollIndicator={false}
+          renderItem={({ item: exp }) => (
+            <View style={styles.expenseItem}>
+              <View style={[styles.expenseIconWrapper, { backgroundColor: `${exp.color || '#6366F1'}15` }]}>
+                <Ionicons name={exp.icon || 'wallet-outline'} size={20} color={exp.color || '#6366F1'} />
+              </View>
+              <View style={styles.expenseDetails}>
+                <Text style={styles.expenseTitle}>{exp.title}</Text>
+                <Text style={styles.expenseMeta}>
+                  {exp.category} • {exp.date}
+                </Text>
+              </View>
+              <Text style={styles.expenseAmount}>
+                -${exp.amount?.toFixed(2) || '0.00'}
               </Text>
             </View>
-            <Text style={styles.expenseAmount}>
-              -${exp.amount.toFixed(2)}
-            </Text>
-          </View>
-        )}
-        ListEmptyComponent={
-          <View style={styles.emptyState}>
-            <Ionicons name="receipt-outline" size={48} color="#334155" />
-            <Text style={styles.emptyStateText}>No expenses to show</Text>
-          </View>
-        }
-      />
+          )}
+          ListEmptyComponent={
+            <View style={styles.emptyState}>
+              <Ionicons name="receipt-outline" size={48} color="#334155" />
+              <Text style={styles.emptyStateText}>No expenses to show</Text>
+            </View>
+          }
+        />
+      )}
     </ScreenWrapper>
   );
 };
@@ -63,6 +135,38 @@ const styles = StyleSheet.create({
     fontSize: 20,
     fontWeight: "700",
     color: "#FFFFFF",
+  },
+  monthSelectorContainer: {
+    marginBottom: 20,
+  },
+  monthScroll: {
+    paddingHorizontal: 20,
+    gap: 10,
+  },
+  monthPill: {
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: 20,
+    backgroundColor: "rgba(30,41,59,0.5)",
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.1)",
+  },
+  monthPillActive: {
+    backgroundColor: "#6366F1",
+    borderColor: "#6366F1",
+  },
+  monthPillText: {
+    color: "#94A3B8",
+    fontSize: 14,
+    fontWeight: "600",
+  },
+  monthPillTextActive: {
+    color: "#FFFFFF",
+  },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
   },
   listContainer: {
     paddingHorizontal: 20,

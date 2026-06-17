@@ -19,7 +19,7 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 import ScreenWrapper from "../../components/layout/AppWrapper";
 import { LinearGradient } from "expo-linear-gradient";
 import Ionicons from "@expo/vector-icons/Ionicons";
-import { getBudgetService, saveBudgetService } from "../../api/expenseService";
+import { getBudgetService, saveBudgetService, addExpenseItemService, getExpensesByMonthService, getMonthlyActivityAPI } from "../../api/expenseService";
 import {
   showSuccessToastMessage,
   showWarningToastMessage,
@@ -43,7 +43,7 @@ const MONTHS = [
   "nov",
   "dec",
 ];
-const MAX_CHART_VALUE = 130;
+
 
 // Category configurations
 const CATEGORY_CONFIG = {
@@ -65,6 +65,7 @@ const Expense = ({ navigation }) => {
   const [refreshing, setRefreshing] = useState(false);
   const [modalVisible, setModalVisible] = useState(false);
   const [budgetModalVisible, setBudgetModalVisible] = useState(false);
+  const [activeTooltip, setActiveTooltip] = useState(null);
 
   // Form States
   const [title, setTitle] = useState("");
@@ -90,14 +91,14 @@ const Expense = ({ navigation }) => {
   );
 
   // Monthly chart data generator
-  const monthlyData = useMemo(() => {
-    const currentMonth = new Date().getMonth();
-    return MONTHS.map((month, index) => ({
+  const currentMonthIdx = new Date().getMonth();
+  const [monthlyData, setMonthlyData] = useState(
+    MONTHS.map((month, index) => ({
       day: month,
-      amount: Math.floor(Math.random() * 120) + 10,
-      isToday: index === currentMonth,
-    }));
-  }, []);
+      amount: 0,
+      isToday: index === currentMonthIdx,
+    }))
+  );
 
   // Fetch budget data
   const fetchBudget = useCallback(async () => {
@@ -134,8 +135,31 @@ const Expense = ({ navigation }) => {
 
         setCategories(mappedCategories);
 
-        if (budgetData.expenses) {
-          setExpenses(budgetData.expenses);
+        try {
+          const expensesResponse = await getExpensesByMonthService(
+            today.getMonth() + 1,
+            today.getFullYear(),
+          );
+          if (expensesResponse?.data) {
+            setExpenses(expensesResponse.data);
+          }
+        } catch (expError) {
+          console.error("Failed to load expenses:", expError);
+        }
+
+        try {
+          const activityResponse = await getMonthlyActivityAPI(today.getFullYear());
+          if (activityResponse?.data) {
+            const currentMonth = today.getMonth();
+            const formattedActivity = activityResponse.data.map((item) => ({
+              day: MONTHS[item.month - 1] || "unk",
+              amount: item.totalAmount || 0,
+              isToday: (item.month - 1) === currentMonth,
+            }));
+            setMonthlyData(formattedActivity);
+          }
+        } catch (actError) {
+          console.error("Failed to load monthly activity:", actError);
         }
 
         showSuccessToastMessage("Budget data loaded successfully");
@@ -248,25 +272,49 @@ const Expense = ({ navigation }) => {
 
     setIsAddingExpense(true);
 
-    // Simulate small delay for UI feedback
-    setTimeout(() => {
+    try {
+      const today = new Date();
       const newExpense = {
-        id: Date.now().toString(),
         title: title.trim(),
         category,
         amount: parseFloat(amount),
         date: "Today",
+        month: today.getMonth() + 1,
+        year: today.getFullYear(),
         icon: selectedCat.icon,
         color: selectedCat.color,
       };
 
-      setExpenses((prev) => [newExpense, ...prev]);
+      const token = await AsyncStorage.getItem("token");
+      if (!token || token === "undefined" || token === "null") {
+        newExpense.id = Date.now().toString();
+        setExpenses((prev) => [newExpense, ...prev]);
+        showSuccessToastMessage("Demo: Expense added locally");
+      } else {
+        const response = await addExpenseItemService(newExpense);
+        if (response?.data) {
+          setExpenses((prev) => [response.data, ...prev]);
+          setMonthlyData((prev) => {
+            const newMonthIdx = response.data.month - 1;
+            const updated = [...prev];
+            if (updated[newMonthIdx]) {
+              updated[newMonthIdx].amount += response.data.amount;
+            }
+            return updated;
+          });
+          showSuccessToastMessage("Expense added successfully");
+        }
+      }
+
       setTitle("");
       setAmount("");
       setModalVisible(false);
-      showSuccessToastMessage("Expense added successfully");
+    } catch (error) {
+      console.error("Failed to add expense:", error);
+      showFailureToastMessage("Failed to add expense");
+    } finally {
       setIsAddingExpense(false);
-    }, 400);
+    }
   }, [title, amount, category, categories]);
 
   // Open budget modal
@@ -379,34 +427,50 @@ const Expense = ({ navigation }) => {
           <Text style={styles.sectionTitle}>Monthly Activity</Text>
           <View style={styles.chartCard}>
             <View style={styles.chartContainer}>
-              {monthlyData.map((item, index) => {
-                const pct = (item.amount / MAX_CHART_VALUE) * 100;
-                return (
-                  <View key={index} style={styles.chartBarWrapper}>
-                    <View style={styles.chartTrack}>
-                      <View
-                        style={[
-                          styles.chartBar,
-                          {
-                            height: `${pct}%`,
-                            backgroundColor: item.isToday
-                              ? "#A855F7"
-                              : "#6366F1",
-                          },
-                        ]}
-                      />
-                    </View>
-                    <Text
-                      style={[
-                        styles.chartDayLabel,
-                        item.isToday && styles.todayDayLabel,
-                      ]}
+              {(() => {
+                const maxMonthValue = Math.max(...monthlyData.map(d => d.amount));
+                const dynamicMaxValue = maxMonthValue > 0 ? maxMonthValue : 1;
+                
+                return monthlyData.map((item, index) => {
+                  const pct = (item.amount / dynamicMaxValue) * 100;
+                  return (
+                    <TouchableOpacity 
+                      key={index} 
+                      style={styles.chartBarWrapper}
+                      activeOpacity={0.8}
+                      onPress={() => setActiveTooltip(activeTooltip === index ? null : index)}
                     >
-                      {item.day}
-                    </Text>
-                  </View>
-                );
-              })}
+                      {activeTooltip === index && (
+                        <View style={styles.tooltipContainer}>
+                          <Text style={styles.tooltipText}>${item.amount}</Text>
+                          <View style={styles.tooltipArrow} />
+                        </View>
+                      )}
+                      <View style={styles.chartTrack}>
+                        <View
+                          style={[
+                            styles.chartBar,
+                            {
+                              height: `${pct}%`,
+                              backgroundColor: item.isToday
+                                ? "#A855F7"
+                                : "#6366F1",
+                            },
+                          ]}
+                        />
+                      </View>
+                      <Text
+                        style={[
+                          styles.chartDayLabel,
+                          item.isToday && styles.todayDayLabel,
+                        ]}
+                      >
+                        {item.day}
+                      </Text>
+                    </TouchableOpacity>
+                  );
+                });
+              })()}
             </View>
           </View>
 
@@ -421,8 +485,8 @@ const Expense = ({ navigation }) => {
           </View>
           <View style={styles.expensesList}>
             {expenses.length > 0 ? (
-              expenses.slice(0, 3).map((exp) => (
-                <View key={exp.id} style={styles.expenseItem}>
+              expenses.slice(0, 3).map((exp, index) => (
+                <View key={exp._id || exp.id || index} style={styles.expenseItem}>
                   <View
                     style={[
                       styles.expenseIconWrapper,
@@ -822,10 +886,47 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
     alignItems: "flex-end",
     height: 120,
+    marginTop: 20,
   },
 
   chartBarWrapper: {
     alignItems: "center",
+    position: "relative",
+  },
+  
+  tooltipContainer: {
+    position: "absolute",
+    top: -35,
+    backgroundColor: "#1E293B",
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 6,
+    alignItems: "center",
+    zIndex: 10,
+    elevation: 5,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.25,
+    shadowRadius: 3.84,
+  },
+  
+  tooltipText: {
+    color: "#FFFFFF",
+    fontSize: 12,
+    fontWeight: "700",
+  },
+  
+  tooltipArrow: {
+    position: "absolute",
+    bottom: -4,
+    width: 0,
+    height: 0,
+    borderLeftWidth: 4,
+    borderRightWidth: 4,
+    borderTopWidth: 4,
+    borderLeftColor: "transparent",
+    borderRightColor: "transparent",
+    borderTopColor: "#1E293B",
   },
 
   chartTrack: {

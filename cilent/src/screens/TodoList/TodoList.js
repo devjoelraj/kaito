@@ -23,10 +23,11 @@ import FloatingBar from "../../components/FloatingBar";
 import LoadingSpinner from "../../components/loading/LoadingSpinner";
 import {
   createTodoService,
-  getTodosService,
-  getTodosByDateService,
   updateTodoService,
   deleteTodoService,
+  getTodosService,
+  getTodosByDateService,
+  getOtherTodosAPI,
 } from "../../api/TodoServices";
 
 const getWeekDates = () => {
@@ -36,10 +37,10 @@ const getWeekDates = () => {
   const weekDays = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
   const dates = [
     {
-      id: "all",
-      day: "All",
-      date: "All",
-      fullDate: "all",
+      id: "other",
+      day: "Other",
+      date: "Dates",
+      fullDate: "other",
     },
   ];
 
@@ -72,6 +73,8 @@ const TodoList = ({ navigation }) => {
   const [taskPriority, setTaskPriority] = useState("second");
   const [editingTask, setEditingTask] = useState(null);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [taskDate, setTaskDate] = useState(new Date());
+  const [showDatePicker, setShowDatePicker] = useState(false);
 
   const today = new Date();
   const currentMonth = today.toLocaleString("default", { month: "short" });
@@ -127,8 +130,10 @@ const TodoList = ({ navigation }) => {
     try {
       setLoading(true);
       let response;
-      if (selectedDate === "all") {
-        response = await getTodosService();
+      if (selectedDate === "all" || selectedDate === "other") {
+        const startDate = weekDates.length > 1 ? weekDates[1].fullDate : new Date().toISOString().split("T")[0];
+        const endDate = weekDates.length > 1 ? weekDates[weekDates.length - 1].fullDate : new Date().toISOString().split("T")[0];
+        response = await getOtherTodosAPI(startDate, endDate);
       } else {
         response = await getTodosByDateService(selectedDate);
       }
@@ -188,7 +193,9 @@ const TodoList = ({ navigation }) => {
     defaultTime.setSeconds(0);
     setTaskTime(defaultTime);
     setTaskPriority("second");
+    setTaskDate(new Date());
     setShowTimePicker(false);
+    setShowDatePicker(false);
     setIsModalVisible(true);
   };
 
@@ -198,7 +205,9 @@ const TodoList = ({ navigation }) => {
     setTaskTime(formatTimeFromString(task.time));
     setTaskPriority(task.priority || "second");
     setTaskTitleError("");
+    setTaskDate(task.date ? new Date(task.date) : new Date());
     setShowTimePicker(false);
+    setShowDatePicker(false);
     setIsModalVisible(true);
   };
 
@@ -221,8 +230,8 @@ const TodoList = ({ navigation }) => {
         title: taskTitle.trim(),
         time: formatTime(taskTime),
         date:
-          selectedDate === "all"
-            ? new Date().toISOString().split("T")[0]
+          selectedDate === "all" || selectedDate === "other"
+            ? taskDate.toISOString().split("T")[0]
             : selectedDate,
         duration: "1h",
         completed: false,
@@ -353,7 +362,7 @@ const TodoList = ({ navigation }) => {
   };
 
   const filteredTasks =
-    selectedDate === "all"
+    selectedDate === "all" || selectedDate === "other"
       ? taskList
       : taskList.filter((task) => task.date === selectedDate);
 
@@ -544,6 +553,54 @@ const TodoList = ({ navigation }) => {
                     <Text style={styles.errorText}>{taskTitleError}</Text>
                   ) : null}
                 </View>
+
+                {(selectedDate === "all" || selectedDate === "other") && (
+                  <View style={styles.formGroup}>
+                    <Text style={styles.label}>Date</Text>
+                    {Platform.OS === "ios" ? (
+                      <View style={styles.iosPickerWrapper}>
+                        <Text style={styles.iosPickerLabel}>Select Date</Text>
+                        <DateTimePicker
+                          value={taskDate}
+                          mode="date"
+                          display="default"
+                          themeVariant="dark"
+                          onChange={(event, selected) => {
+                            if (selected) setTaskDate(selected);
+                          }}
+                        />
+                      </View>
+                    ) : (
+                      <>
+                        <TouchableOpacity
+                          activeOpacity={0.8}
+                          style={styles.timePickerButton}
+                          onPress={() => setShowDatePicker(true)}
+                        >
+                          <Text style={styles.timePickerButtonText}>
+                            {taskDate.toISOString().split("T")[0]}
+                          </Text>
+                          <MaterialIcons
+                            name="calendar-today"
+                            size={20}
+                            color="#94A3B8"
+                          />
+                        </TouchableOpacity>
+                        {showDatePicker && (
+                          <DateTimePicker
+                            value={taskDate}
+                            mode="date"
+                            display="default"
+                            onChange={(event, selected) => {
+                              setShowDatePicker(false);
+                              if (selected) setTaskDate(selected);
+                            }}
+                          />
+                        )}
+                      </>
+                    )}
+                  </View>
+                )}
 
                 <View style={styles.formGroup}>
                   <Text style={styles.label}>Time</Text>

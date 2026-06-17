@@ -32,40 +32,6 @@ const Dashboard = ({ navigation }) => {
     dot: "#39C16C",
   };
 
-  // Mock combined activity feed
-  const recentActivities = [
-    {
-      id: "act-1",
-      type: "expense",
-      title: "Grocery Shopping",
-      category: "Food & Drinks",
-      amount: 84.5,
-      icon: "fast-food-outline",
-      color: "#F59E0B",
-      time: "Today, 2:30 PM",
-    },
-    {
-      id: "act-2",
-      type: "todo",
-      title: "Get a notebook",
-      category: "Todo Completed",
-      icon: "checkmark-circle-outline",
-      color: "#10B981",
-      time: "Today, 11:15 AM",
-      completed: true,
-    },
-    {
-      id: "act-3",
-      type: "expense",
-      title: "Uber Ride",
-      category: "Transport",
-      amount: 24.3,
-      icon: "car-outline",
-      color: "#3B82F6",
-      time: "Yesterday",
-    },
-  ];
-
   return (
     <ScreenWrapper
       scroll
@@ -100,21 +66,31 @@ const Dashboard = ({ navigation }) => {
           >
             <View style={styles.statsHeader}>
               <Text style={styles.statsLabel}>TASKS TODAY</Text>
-              <View style={[styles.statsIconBg, { backgroundColor: "rgba(99, 102, 241, 0.15)" }]}>
+              <View
+                style={[
+                  styles.statsIconBg,
+                  { backgroundColor: "rgba(99, 102, 241, 0.15)" },
+                ]}
+              >
                 <Ionicons name="checkbox-outline" size={16} color="#818CF8" />
               </View>
             </View>
             <Text style={styles.statsValue}>
               {completedTasks}/{totalTasks}
             </Text>
-            <Text style={styles.statsSub}>{Math.round(taskCompletionRate)}% Done</Text>
-            
+            <Text style={styles.statsSub}>
+              {Math.round(taskCompletionRate)}% Done
+            </Text>
+
             {/* Task Progress Bar */}
             <View style={styles.progressBarBg}>
               <View
                 style={[
                   styles.progressBarFill,
-                  { width: `${taskCompletionRate}%`, backgroundColor: "#6366F1" },
+                  {
+                    width: `${taskCompletionRate}%`,
+                    backgroundColor: "#6366F1",
+                  },
                 ]}
               />
             </View>
@@ -128,7 +104,12 @@ const Dashboard = ({ navigation }) => {
           >
             <View style={styles.statsHeader}>
               <Text style={styles.statsLabel}>BUDGET LEFT</Text>
-              <View style={[styles.statsIconBg, { backgroundColor: "rgba(16, 185, 129, 0.15)" }]}>
+              <View
+                style={[
+                  styles.statsIconBg,
+                  { backgroundColor: "rgba(16, 185, 129, 0.15)" },
+                ]}
+              >
                 <Ionicons name="wallet-outline" size={16} color="#34D399" />
               </View>
             </View>
@@ -136,13 +117,16 @@ const Dashboard = ({ navigation }) => {
               ${(budgetLimit - totalSpent).toFixed(0)}
             </Text>
             <Text style={styles.statsSub}>Limit: ${budgetLimit}</Text>
-            
+
             {/* Budget Progress Bar */}
             <View style={styles.progressBarBg}>
               <View
                 style={[
                   styles.progressBarFill,
-                  { width: `${budgetProgress * 100}%`, backgroundColor: "#10B981" },
+                  {
+                    width: `${budgetProgress * 100}%`,
+                    backgroundColor: "#10B981",
+                  },
                 ]}
               />
             </View>
@@ -161,7 +145,12 @@ const Dashboard = ({ navigation }) => {
               colors={["rgba(99, 102, 241, 0.1)", "rgba(168, 85, 247, 0.1)"]}
               style={styles.actionGradient}
             >
-              <View style={[styles.actionIconWrapper, { backgroundColor: "rgba(99, 102, 241, 0.2)" }]}>
+              <View
+                style={[
+                  styles.actionIconWrapper,
+                  { backgroundColor: "rgba(99, 102, 241, 0.2)" },
+                ]}
+              >
                 <Ionicons name="add-circle-outline" size={24} color="#818CF8" />
               </View>
               <Text style={styles.actionButtonText}>Add New Task</Text>
@@ -177,7 +166,12 @@ const Dashboard = ({ navigation }) => {
               colors={["rgba(16, 185, 129, 0.1)", "rgba(59, 130, 246, 0.1)"]}
               style={styles.actionGradient}
             >
-              <View style={[styles.actionIconWrapper, { backgroundColor: "rgba(16, 185, 129, 0.2)" }]}>
+              <View
+                style={[
+                  styles.actionIconWrapper,
+                  { backgroundColor: "rgba(16, 185, 129, 0.2)" },
+                ]}
+              >
                 <Ionicons name="cash-outline" size={24} color="#34D399" />
               </View>
               <Text style={styles.actionButtonText}>Add Expense</Text>
@@ -197,42 +191,19 @@ const Dashboard = ({ navigation }) => {
             <View style={styles.spotlightMeta}>
               <View style={styles.spotlightDot} />
               <Text style={styles.spotlightTime}>{nextTask.time}</Text>
-              <Text style={styles.spotlightDuration}>({nextTask.duration})</Text>
+              <Text style={styles.spotlightDuration}>
+                ({nextTask.duration})
+              </Text>
             </View>
             <Text style={styles.spotlightTitle}>{nextTask.title}</Text>
           </View>
-          <Ionicons name="chevron-forward" size={20} color="#64748B" style={styles.spotlightArrow} />
+          <Ionicons
+            name="chevron-forward"
+            size={20}
+            color="#64748B"
+            style={styles.spotlightArrow}
+          />
         </TouchableOpacity>
-
-        {/* Recent Activity Combined Feed */}
-        <Text style={styles.sectionTitle}>Recent Activity</Text>
-        <View style={styles.activityFeed}>
-          {recentActivities.map((act) => (
-            <View key={act.id} style={styles.activityItem}>
-              <View
-                style={[
-                  styles.activityIconWrapper,
-                  { backgroundColor: `${act.color}15` },
-                ]}
-              >
-                <Ionicons name={act.icon} size={20} color={act.color} />
-              </View>
-              <View style={styles.activityDetails}>
-                <Text style={styles.activityTitle}>{act.title}</Text>
-                <Text style={styles.activityMeta}>
-                  {act.category} • {act.time}
-                </Text>
-              </View>
-              {act.type === "expense" ? (
-                <Text style={styles.expenseAmount}>-${act.amount.toFixed(2)}</Text>
-              ) : (
-                <View style={styles.todoBadge}>
-                  <Text style={styles.todoBadgeText}>Done</Text>
-                </View>
-              )}
-            </View>
-          ))}
-        </View>
       </View>
     </ScreenWrapper>
   );
@@ -421,39 +392,39 @@ const styles = StyleSheet.create({
   spotlightArrow: {
     marginLeft: 8,
   },
-  activityFeed: {
-    gap: 12,
-  },
-  activityItem: {
-    flexDirection: "row",
-    alignItems: "center",
-    backgroundColor: "rgba(30, 41, 59, 0.3)",
-    borderRadius: 16,
-    padding: 12,
-    borderWidth: 1,
-    borderColor: "rgba(255, 255, 255, 0.02)",
-  },
-  activityIconWrapper: {
-    width: 40,
-    height: 40,
-    borderRadius: 12,
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  activityDetails: {
-    flex: 1,
-    marginLeft: 12,
-  },
-  activityTitle: {
-    fontSize: 14,
-    fontWeight: "600",
-    color: "#FFFFFF",
-  },
-  activityMeta: {
-    fontSize: 11,
-    color: "#64748B",
-    marginTop: 2,
-  },
+  // activityFeed: {
+  //   gap: 12,
+  // },
+  // activityItem: {
+  //   flexDirection: "row",
+  //   alignItems: "center",
+  //   backgroundColor: "rgba(30, 41, 59, 0.3)",
+  //   borderRadius: 16,
+  //   padding: 12,
+  //   borderWidth: 1,
+  //   borderColor: "rgba(255, 255, 255, 0.02)",
+  // },
+  // activityIconWrapper: {
+  //   width: 40,
+  //   height: 40,
+  //   borderRadius: 12,
+  //   justifyContent: "center",
+  //   alignItems: "center",
+  // },
+  // activityDetails: {
+  //   flex: 1,
+  //   marginLeft: 12,
+  // },
+  // activityTitle: {
+  //   fontSize: 14,
+  //   fontWeight: "600",
+  //   color: "#FFFFFF",
+  // },
+  // activityMeta: {
+  //   fontSize: 11,
+  //   color: "#64748B",
+  //   marginTop: 2,
+  // },
   expenseAmount: {
     fontSize: 14,
     fontWeight: "700",
@@ -471,4 +442,3 @@ const styles = StyleSheet.create({
     fontWeight: "600",
   },
 });
-
