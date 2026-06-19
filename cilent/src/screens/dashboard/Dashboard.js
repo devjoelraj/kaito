@@ -7,6 +7,7 @@ import {
   ScrollView,
   Dimensions,
   ActivityIndicator,
+  Animated,
 } from "react-native";
 import { useFocusEffect } from "@react-navigation/native";
 import ScreenWrapper from "../../components/layout/AppWrapper";
@@ -17,6 +18,48 @@ import { getDashboardDataAPI } from "../../api/dashBoard";
 import { getBudgetService } from "../../api/expenseService";
 
 const { width } = Dimensions.get("window");
+
+const DashboardSkeleton = () => {
+  const fadeAnim = React.useRef(new Animated.Value(0.3)).current;
+
+  React.useEffect(() => {
+    Animated.loop(
+      Animated.sequence([
+        Animated.timing(fadeAnim, {
+          toValue: 0.7,
+          duration: 800,
+          useNativeDriver: true,
+        }),
+        Animated.timing(fadeAnim, {
+          toValue: 0.3,
+          duration: 800,
+          useNativeDriver: true,
+        }),
+      ])
+    ).start();
+  }, [fadeAnim]);
+
+  return (
+    <Animated.View style={{ opacity: fadeAnim, width: '100%', marginTop: 10 }}>
+      {/* Stats Cards */}
+      <View style={{ flexDirection: 'row', gap: 12, marginBottom: 24 }}>
+        <View style={{ flex: 1, height: 130, backgroundColor: 'rgba(255,255,255,0.08)', borderRadius: 20 }} />
+        <View style={{ flex: 1, height: 130, backgroundColor: 'rgba(255,255,255,0.08)', borderRadius: 20 }} />
+      </View>
+      {/* Quick Actions Title */}
+      <View style={{ width: 120, height: 20, backgroundColor: 'rgba(255,255,255,0.08)', borderRadius: 10, marginBottom: 14 }} />
+      {/* Quick Actions Buttons */}
+      <View style={{ flexDirection: 'row', gap: 12, marginBottom: 24 }}>
+        <View style={{ flex: 1, height: 68, backgroundColor: 'rgba(255,255,255,0.08)', borderRadius: 16 }} />
+        <View style={{ flex: 1, height: 68, backgroundColor: 'rgba(255,255,255,0.08)', borderRadius: 16 }} />
+      </View>
+      {/* Next Up Title */}
+      <View style={{ width: 140, height: 20, backgroundColor: 'rgba(255,255,255,0.08)', borderRadius: 10, marginBottom: 14 }} />
+      {/* Spotlight Card */}
+      <View style={{ height: 90, backgroundColor: 'rgba(255,255,255,0.08)', borderRadius: 20 }} />
+    </Animated.View>
+  );
+};
 
 const Dashboard = ({ navigation }) => {
   const [dashboardData, setDashboardData] = useState(null);
@@ -119,8 +162,8 @@ const Dashboard = ({ navigation }) => {
           </TouchableOpacity>
         </View>
 
-        {loading ? (
-          <ActivityIndicator size="large" color="#6366F1" style={{ marginTop: 40 }} />
+        {loading && !dashboardData ? (
+          <DashboardSkeleton />
         ) : (
           <>
             {/* Unified Double Cards Widget */}
