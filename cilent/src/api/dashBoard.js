@@ -13,3 +13,15 @@ export const getDashboardDataAPI = async (date, month, year) => {
     throw error;
   }
 };
+
+export const getProfileAPI = async () => {
+  try {
+    const response = await apiClient.get("/dashboard/profile");
+    if (response.status === 200) {
+      return response.data;
+    }
+  } catch (error) {
+    console.error("Profile API Error:", error);
+    throw error;
+  }
+};

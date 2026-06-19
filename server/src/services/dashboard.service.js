@@ -1,6 +1,7 @@
 import mongoose from "mongoose";
 import Todo from "../models/todo.model.js";
 import Expense from "../models/expense.model.js";
+import User from "../models/user.model.js";
 
 export const getDashboardDataService = async (userId, date, month, year) => {
   const startDate = new Date(date);
@@ -65,6 +66,8 @@ export const getDashboardDataService = async (userId, date, month, year) => {
   const totalExpenseMonth =
     expensesThisMonth.length > 0 ? expensesThisMonth[0].totalAmount : 0;
 
+  const userData = await User.findById(userId).select("-password");
+
   return {
     topTodos: topTodosSortedByTime,
     todoCard: {
@@ -75,5 +78,10 @@ export const getDashboardDataService = async (userId, date, month, year) => {
     expenseCard: {
       totalExpenseMonth,
     },
+    user: userData,
   };
+};
+
+export const getProfileService = async (userId) => {
+  return await User.findById(userId).select("-password");
 };

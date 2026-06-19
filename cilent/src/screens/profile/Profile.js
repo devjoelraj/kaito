@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useCallback } from "react";
 import {
   View,
   Text,
@@ -9,18 +9,41 @@ import {
   ActivityIndicator,
 } from "react-native";
 import AsyncStorage from "@react-native-async-storage/async-storage";
+import { useFocusEffect } from "@react-navigation/native";
 import ScreenWrapper from "../../components/layout/AppWrapper";
 import { LinearGradient } from "expo-linear-gradient";
 import Ionicons from "@expo/vector-icons/Ionicons";
+import { getProfileAPI } from "../../api/dashBoard";
 
 const Profile = ({ navigation }) => {
   const [loggingOut, setLoggingOut] = useState(false);
+  const [userData, setUserData] = useState(null);
+  const [loadingProfile, setLoadingProfile] = useState(true);
 
-  // Mock User Data
-  const user = {
-    name: "Joel",
-    email: "joel@example.com",
-  };
+  useFocusEffect(
+    useCallback(() => {
+      let isActive = true;
+      const loadProfile = async () => {
+        try {
+          setLoadingProfile(true);
+          const response = await getProfileAPI();
+          if (isActive && response && response.success) {
+            setUserData(response.data);
+          }
+        } catch (error) {
+          console.error("Failed to load profile", error);
+        } finally {
+          if (isActive) {
+            setLoadingProfile(false);
+          }
+        }
+      };
+      loadProfile();
+      return () => {
+        isActive = false;
+      };
+    }, []),
+  );
 
   const handleLogout = async () => {
     Alert.alert(
@@ -67,6 +90,17 @@ const Profile = ({ navigation }) => {
     </TouchableOpacity>
   );
 
+  const getInitials = (name) => {
+    if (!name) return "U";
+    return name.charAt(0).toUpperCase();
+  };
+
+  const getMemberSince = (dateString) => {
+    if (!dateString) return "2026";
+    const date = new Date(dateString);
+    return date.getFullYear().toString();
+  };
+
   return (
     <ScreenWrapper scroll backgroundColor="#0F172A" barStyle="light-content">
       <View style={styles.container}>
@@ -80,26 +114,42 @@ const Profile = ({ navigation }) => {
           colors={["#1E1B4B", "#0F172A"]}
           style={styles.profileCard}
         >
-          <View style={styles.avatarContainer}>
-            <LinearGradient
-              colors={["#A855F7", "#6366F1"]}
-              style={styles.avatarGradient}
-            >
-              <Text style={styles.avatarText}>{user.name.charAt(0)}</Text>
-            </LinearGradient>
-          </View>
-          <Text style={styles.userName}>{user.name}</Text>
-          <Text style={styles.userEmail}>{user.email}</Text>
+          {loadingProfile ? (
+            <ActivityIndicator
+              size="large"
+              color="#6366F1"
+              style={{ marginVertical: 40 }}
+            />
+          ) : (
+            <>
+              <View style={styles.avatarContainer}>
+                <LinearGradient
+                  colors={["#A855F7", "#6366F1"]}
+                  style={styles.avatarGradient}
+                >
+                  <Text style={styles.avatarText}>
+                    {getInitials(userData?.name)}
+                  </Text>
+                </LinearGradient>
+              </View>
+              <Text style={styles.userName}>{userData?.name || "User"}</Text>
+              <Text style={styles.userEmail}>
+                {userData?.email || "user@example.com"}
+              </Text>
+              {userData?.createdAt && (
+                <View style={styles.badge}>
+                  <Text style={styles.badgeText}>
+                    Member since {getMemberSince(userData?.createdAt)}
+                  </Text>
+                </View>
+              )}
+            </>
+          )}
         </LinearGradient>
 
         {/* Settings List */}
         <Text style={styles.sectionTitle}>Settings</Text>
         <View style={styles.settingsContainer}>
-          <SettingsRow
-            icon="person-outline"
-            title="Edit Profile"
-            color="#3B82F6"
-          />
           <SettingsRow
             icon="notifications-outline"
             title="Notifications"

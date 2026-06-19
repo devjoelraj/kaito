@@ -98,7 +98,9 @@ const Dashboard = ({ navigation }) => {
         {/* Header Section */}
         <View style={styles.header}>
           <View>
-            <Text style={styles.welcomeText}>Hello, Joel 👋</Text>
+            <Text style={styles.welcomeText}>
+              Hello, {dashboardData?.user?.name ? dashboardData.user.name.split(' ')[0] : "User"} 👋
+            </Text>
             <Text style={styles.subtitleText}>Ready to tackle today?</Text>
           </View>
           <TouchableOpacity
@@ -110,7 +112,9 @@ const Dashboard = ({ navigation }) => {
               colors={["#A855F7", "#6366F1"]}
               style={styles.profileGradient}
             >
-              <Text style={styles.profileInitial}>J</Text>
+              <Text style={styles.profileInitial}>
+                {dashboardData?.user?.name ? dashboardData.user.name.charAt(0).toUpperCase() : "U"}
+              </Text>
             </LinearGradient>
           </TouchableOpacity>
         </View>
