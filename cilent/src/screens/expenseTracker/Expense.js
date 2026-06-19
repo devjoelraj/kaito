@@ -1,4 +1,10 @@
-import React, { useEffect, useState, useCallback, useMemo } from "react";
+import React, {
+  useEffect,
+  useState,
+  useCallback,
+  useRef,
+  useMemo,
+} from "react";
 import {
   View,
   Text,
@@ -19,7 +25,13 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 import ScreenWrapper from "../../components/layout/AppWrapper";
 import { LinearGradient } from "expo-linear-gradient";
 import Ionicons from "@expo/vector-icons/Ionicons";
-import { getBudgetService, saveBudgetService, addExpenseItemService, getExpensesByMonthService, getMonthlyActivityAPI } from "../../api/expenseService";
+import {
+  getBudgetService,
+  saveBudgetService,
+  addExpenseItemService,
+  getExpensesByMonthService,
+  getMonthlyActivityAPI,
+} from "../../api/expenseService";
 import {
   showSuccessToastMessage,
   showWarningToastMessage,
@@ -44,7 +56,6 @@ const MONTHS = [
   "dec",
 ];
 
-
 // Category configurations
 const CATEGORY_CONFIG = {
   "Food & Drinks": { icon: "fast-food-outline", color: "#F59E0B" },
@@ -66,8 +77,9 @@ const Expense = ({ navigation }) => {
   const [modalVisible, setModalVisible] = useState(false);
   const [budgetModalVisible, setBudgetModalVisible] = useState(false);
   const [activeTooltip, setActiveTooltip] = useState(null);
+  const [selectedBar, setSelectedBar] = useState(null);
 
-  // Form States
+  const hideTimerRef = useRef(null); // Form States
   const [title, setTitle] = useState("");
   const [amount, setAmount] = useState("");
   const [category, setCategory] = useState("Food & Drinks");
@@ -79,6 +91,38 @@ const Expense = ({ navigation }) => {
   const [isSaving, setIsSaving] = useState(false);
   const [isAddingExpense, setIsAddingExpense] = useState(false);
 
+  useEffect(() => {
+    return () => {
+      if (hideTimerRef.current) {
+        clearTimeout(hideTimerRef.current);
+      }
+    };
+  }, []);
+  const handleBarPress = useCallback(
+    (item) => {
+      if (hideTimerRef.current) {
+        clearTimeout(hideTimerRef.current);
+      }
+
+      if (selectedBar?.day === item.day) {
+        setSelectedBar(null);
+        return;
+      }
+
+      setSelectedBar(item);
+
+      hideTimerRef.current = setTimeout(() => {
+        setSelectedBar((current) => {
+          if (current?.day === item.day) {
+            return null;
+          }
+
+          return current;
+        });
+      }, 3000);
+    },
+    [selectedBar],
+  );
   // Computed Values
   const totalSpent = useMemo(
     () => expenses.reduce((sum, item) => sum + item.amount, 0),
@@ -97,7 +141,7 @@ const Expense = ({ navigation }) => {
       day: month,
       amount: 0,
       isToday: index === currentMonthIdx,
-    }))
+    })),
   );
 
   // Fetch budget data
@@ -148,13 +192,15 @@ const Expense = ({ navigation }) => {
         }
 
         try {
-          const activityResponse = await getMonthlyActivityAPI(today.getFullYear());
+          const activityResponse = await getMonthlyActivityAPI(
+            today.getFullYear(),
+          );
           if (activityResponse?.data) {
             const currentMonth = today.getMonth();
             const formattedActivity = activityResponse.data.map((item) => ({
               day: MONTHS[item.month - 1] || "unk",
               amount: item.totalAmount || 0,
-              isToday: (item.month - 1) === currentMonth,
+              isToday: item.month - 1 === currentMonth,
             }));
             setMonthlyData(formattedActivity);
           }
@@ -165,13 +211,15 @@ const Expense = ({ navigation }) => {
         showSuccessToastMessage("Budget data loaded successfully");
       } else {
         // No budget data returned from API, load default categories
-        const defaultCategories = Object.keys(CATEGORY_CONFIG).map((catName) => ({
-          name: catName,
-          budget: 0,
-          spent: 0,
-          icon: CATEGORY_CONFIG[catName].icon,
-          color: CATEGORY_CONFIG[catName].color,
-        }));
+        const defaultCategories = Object.keys(CATEGORY_CONFIG).map(
+          (catName) => ({
+            name: catName,
+            budget: 0,
+            spent: 0,
+            icon: CATEGORY_CONFIG[catName].icon,
+            color: CATEGORY_CONFIG[catName].color,
+          }),
+        );
         setCategories(defaultCategories);
       }
     } catch (error) {
@@ -201,9 +249,14 @@ const Expense = ({ navigation }) => {
       return;
     }
 
-    const totalCategoryBudget = tempCategories.reduce((sum, cat) => sum + (parseFloat(cat.budget) || 0), 0);
+    const totalCategoryBudget = tempCategories.reduce(
+      (sum, cat) => sum + (parseFloat(cat.budget) || 0),
+      0,
+    );
     if (totalCategoryBudget > parseFloat(tempBudgetLimit)) {
-      showFailureToastMessage("Category budgets cannot exceed total monthly budget");
+      showFailureToastMessage(
+        "Category budgets cannot exceed total monthly budget",
+      );
       return;
     }
 
@@ -214,7 +267,9 @@ const Expense = ({ navigation }) => {
       console.log("SAVE BUDGET - Current Token:", token);
 
       if (!token || token === "undefined" || token === "null") {
-        console.log("SAVE BUDGET - No valid token found, saving locally for Demo mode");
+        console.log(
+          "SAVE BUDGET - No valid token found, saving locally for Demo mode",
+        );
         // Demo mode: simulate save locally
         setBudgetLimit(parseFloat(tempBudgetLimit));
         setCategories(tempCategories);
@@ -425,44 +480,62 @@ const Expense = ({ navigation }) => {
 
           {/* CHART */}
           <Text style={styles.sectionTitle}>Monthly Activity</Text>
+
           <View style={styles.chartCard}>
+            {selectedBar && (
+              <View style={styles.chartHeader}>
+                <Text style={styles.chartValue}>
+                  {selectedBar.day.toUpperCase()} ${selectedBar.amount}
+                </Text>
+              </View>
+            )}
+
             <View style={styles.chartContainer}>
               {(() => {
-                const maxMonthValue = Math.max(...monthlyData.map(d => d.amount));
+                const maxMonthValue = Math.max(
+                  ...monthlyData.map((item) => item.amount),
+                );
+
                 const dynamicMaxValue = maxMonthValue > 0 ? maxMonthValue : 1;
-                
+
                 return monthlyData.map((item, index) => {
                   const pct = (item.amount / dynamicMaxValue) * 100;
+
+                  const isSelected = selectedBar?.day === item.day;
+
                   return (
-                    <TouchableOpacity 
-                      key={index} 
-                      style={styles.chartBarWrapper}
+                    <TouchableOpacity
+                      key={index}
                       activeOpacity={0.8}
-                      onPress={() => setActiveTooltip(activeTooltip === index ? null : index)}
+                      style={styles.chartBarWrapper}
+                      onPress={() => handleBarPress(item)}
                     >
-                      {activeTooltip === index && (
-                        <View style={styles.tooltipContainer}>
-                          <Text style={styles.tooltipText}>${item.amount}</Text>
-                          <View style={styles.tooltipArrow} />
-                        </View>
-                      )}
-                      <View style={styles.chartTrack}>
+                      <View
+                        style={[
+                          styles.chartTrack,
+                          isSelected && styles.selectedTrack,
+                        ]}
+                      >
                         <View
                           style={[
                             styles.chartBar,
                             {
                               height: `${pct}%`,
-                              backgroundColor: item.isToday
-                                ? "#A855F7"
-                                : "#6366F1",
+                              backgroundColor: isSelected
+                                ? "#C084FC"
+                                : item.isToday
+                                  ? "#A855F7"
+                                  : "#6366F1",
                             },
                           ]}
                         />
                       </View>
+
                       <Text
                         style={[
                           styles.chartDayLabel,
                           item.isToday && styles.todayDayLabel,
+                          isSelected && styles.selectedDayLabel,
                         ]}
                       >
                         {item.day}
@@ -475,10 +548,21 @@ const Expense = ({ navigation }) => {
           </View>
 
           {/* EXPENSES */}
-          <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
-            <Text style={[styles.sectionTitle, { marginBottom: 0 }]}>Recent Expenses</Text>
+          <View
+            style={{
+              flexDirection: "row",
+              justifyContent: "space-between",
+              alignItems: "center",
+              marginBottom: 16,
+            }}
+          >
+            <Text style={[styles.sectionTitle, { marginBottom: 0 }]}>
+              Recent Expenses
+            </Text>
             {expenses.length > 3 && (
-              <TouchableOpacity onPress={() => navigation.navigate("ExpenseList", { expenses })}>
+              <TouchableOpacity
+                onPress={() => navigation.navigate("ExpenseList", { expenses })}
+              >
                 <Ionicons name="chevron-forward" size={24} color="#6366F1" />
               </TouchableOpacity>
             )}
@@ -486,7 +570,10 @@ const Expense = ({ navigation }) => {
           <View style={styles.expensesList}>
             {expenses.length > 0 ? (
               expenses.slice(0, 3).map((exp, index) => (
-                <View key={exp._id || exp.id || index} style={styles.expenseItem}>
+                <View
+                  key={exp._id || exp.id || index}
+                  style={styles.expenseItem}
+                >
                   <View
                     style={[
                       styles.expenseIconWrapper,
@@ -864,7 +951,7 @@ const styles = StyleSheet.create({
     fontSize: 18,
     fontWeight: "700",
     color: "#FFFFFF",
-    marginBottom: 16,
+    // marginBottom: 16,
   },
   subSectionTitle: {
     fontSize: 18,
@@ -874,73 +961,75 @@ const styles = StyleSheet.create({
   },
   loadingContainer: { flex: 1, justifyContent: "center", alignItems: "center" },
   loadingText: { marginTop: 12, color: "#FFFFFF", fontSize: 16 },
-  chartCard: {
-    backgroundColor: "rgba(30,41,59,0.3)",
-    borderRadius: 24,
-    padding: 20,
-    marginBottom: 24,
-  },
 
   chartContainer: {
     flexDirection: "row",
-    justifyContent: "space-between",
     alignItems: "flex-end",
-    height: 120,
+    height: 180,
     marginTop: 20,
   },
 
   chartBarWrapper: {
+    flex: 1,
     alignItems: "center",
+    justifyContent: "flex-end",
     position: "relative",
   },
-  
-  tooltipContainer: {
-    position: "absolute",
-    top: -35,
-    backgroundColor: "#1E293B",
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 6,
-    alignItems: "center",
-    zIndex: 10,
-    elevation: 5,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.25,
-    shadowRadius: 3.84,
+
+  chartCard: {
+    backgroundColor: "rgba(30,41,59,0.3)",
+    borderRadius: 24,
+    paddingHorizontal: 20,
+    paddingVertical: 25,
+    marginBottom: 24,
   },
-  
-  tooltipText: {
+
+  chartHeader: {
+    alignItems: "center",
+    // marginBottom: 20,
+  },
+
+  chartValue: {
     color: "#FFFFFF",
-    fontSize: 12,
+    fontSize: 18,
     fontWeight: "700",
   },
-  
-  tooltipArrow: {
-    position: "absolute",
-    bottom: -4,
-    width: 0,
-    height: 0,
-    borderLeftWidth: 4,
-    borderRightWidth: 4,
-    borderTopWidth: 4,
-    borderLeftColor: "transparent",
-    borderRightColor: "transparent",
-    borderTopColor: "#1E293B",
+
+  chartContainer: {
+    flexDirection: "row",
+    alignItems: "flex-end",
+    height: 140,
+  },
+
+  chartBarWrapper: {
+    flex: 1,
+    alignItems: "center",
+    justifyContent: "flex-end",
   },
 
   chartTrack: {
     height: 100,
-    width: 8,
-    borderRadius: 4,
-    backgroundColor: "rgba(255,255,255,0.05)",
+    width: 14,
+    borderRadius: 7,
+    backgroundColor: "rgba(255,255,255,0.08)",
     overflow: "hidden",
     justifyContent: "flex-end",
   },
 
   chartBar: {
     width: "100%",
-    borderRadius: 4,
+    borderRadius: 7,
+  },
+
+  chartDayLabel: {
+    marginTop: 8,
+    color: "#64748B",
+    fontSize: 11,
+  },
+
+  todayDayLabel: {
+    color: "#A855F7",
+    fontWeight: "700",
   },
 
   chartDayLabel: {

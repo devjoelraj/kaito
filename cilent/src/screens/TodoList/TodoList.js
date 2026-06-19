@@ -131,8 +131,14 @@ const TodoList = ({ navigation }) => {
       setLoading(true);
       let response;
       if (selectedDate === "all" || selectedDate === "other") {
-        const startDate = weekDates.length > 1 ? weekDates[1].fullDate : new Date().toISOString().split("T")[0];
-        const endDate = weekDates.length > 1 ? weekDates[weekDates.length - 1].fullDate : new Date().toISOString().split("T")[0];
+        const startDate =
+          weekDates.length > 1
+            ? weekDates[1].fullDate
+            : new Date().toISOString().split("T")[0];
+        const endDate =
+          weekDates.length > 1
+            ? weekDates[weekDates.length - 1].fullDate
+            : new Date().toISOString().split("T")[0];
         response = await getOtherTodosAPI(startDate, endDate);
       } else {
         response = await getTodosByDateService(selectedDate);
@@ -476,12 +482,16 @@ const TodoList = ({ navigation }) => {
         />
 
         <FlatList
-          data={[
-            { type: "pendingHeader" },
-            ...pendingTasks,
-            { type: "completedHeader" },
-            ...completedTasks,
-          ]}
+          data={
+            pendingTasks.length === 0 && completedTasks.length === 0
+              ? []
+              : [
+                  { type: "pendingHeader" },
+                  ...pendingTasks,
+                  { type: "completedHeader" },
+                  ...completedTasks,
+                ]
+          }
           keyExtractor={(item, index) => item.id || index.toString()}
           showsVerticalScrollIndicator={false}
           contentContainerStyle={styles.taskList}

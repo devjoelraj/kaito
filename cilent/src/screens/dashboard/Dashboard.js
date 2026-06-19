@@ -46,7 +46,11 @@ const Dashboard = ({ navigation }) => {
             <Text style={styles.welcomeText}>Hello, Joel 👋</Text>
             <Text style={styles.subtitleText}>Ready to tackle today?</Text>
           </View>
-          <TouchableOpacity style={styles.profileButton} activeOpacity={0.8}>
+          <TouchableOpacity
+            style={styles.profileButton}
+            activeOpacity={0.8}
+            onPress={() => navigation.navigate("Profile")}
+          >
             <LinearGradient
               colors={["#A855F7", "#6366F1"]}
               style={styles.profileGradient}
@@ -392,39 +396,7 @@ const styles = StyleSheet.create({
   spotlightArrow: {
     marginLeft: 8,
   },
-  // activityFeed: {
-  //   gap: 12,
-  // },
-  // activityItem: {
-  //   flexDirection: "row",
-  //   alignItems: "center",
-  //   backgroundColor: "rgba(30, 41, 59, 0.3)",
-  //   borderRadius: 16,
-  //   padding: 12,
-  //   borderWidth: 1,
-  //   borderColor: "rgba(255, 255, 255, 0.02)",
-  // },
-  // activityIconWrapper: {
-  //   width: 40,
-  //   height: 40,
-  //   borderRadius: 12,
-  //   justifyContent: "center",
-  //   alignItems: "center",
-  // },
-  // activityDetails: {
-  //   flex: 1,
-  //   marginLeft: 12,
-  // },
-  // activityTitle: {
-  //   fontSize: 14,
-  //   fontWeight: "600",
-  //   color: "#FFFFFF",
-  // },
-  // activityMeta: {
-  //   fontSize: 11,
-  //   color: "#64748B",
-  //   marginTop: 2,
-  // },
+
   expenseAmount: {
     fontSize: 14,
     fontWeight: "700",

@@ -1,9 +1,10 @@
-import React from "react";
+import React, { Profiler } from "react";
 
 import { createNativeStackNavigator } from "@react-navigation/native-stack";
 
 import Expense from "../../screens/expenseTracker/Expense";
 import Dashboard from "../../screens/dashboard/Dashboard";
+import Profile from "../../screens/profile/Profile";
 
 const Stack = createNativeStackNavigator();
 
@@ -17,6 +18,7 @@ const DashboardStack = () => {
       }}
     >
       <Stack.Screen name="DashboardHome" component={Dashboard} />
+      <Stack.Screen name="Profile" component={Profile} />
     </Stack.Navigator>
   );
 };
