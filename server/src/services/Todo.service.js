@@ -1,4 +1,4 @@
-import Todo from "../models/Todo.model.js";
+import Todo from "../models/todo.model.js";
 
 export const createTodoService = async (todoData) => {
   return await Todo.create(todoData);

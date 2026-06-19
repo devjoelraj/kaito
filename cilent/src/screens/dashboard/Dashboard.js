@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useState, useCallback } from "react";
 import {
   View,
   Text,
@@ -6,31 +6,86 @@ import {
   TouchableOpacity,
   ScrollView,
   Dimensions,
+  ActivityIndicator,
 } from "react-native";
+import { useFocusEffect } from "@react-navigation/native";
 import ScreenWrapper from "../../components/layout/AppWrapper";
 import { LinearGradient } from "expo-linear-gradient";
 import Ionicons from "@expo/vector-icons/Ionicons";
 
+import { getDashboardDataAPI } from "../../api/dashBoard";
+import { getBudgetService } from "../../api/expenseService";
+
 const { width } = Dimensions.get("window");
 
 const Dashboard = ({ navigation }) => {
-  // Mock statistics for the dashboard dashboard
-  const totalTasks = 5;
-  const completedTasks = 3;
-  const taskCompletionRate = (completedTasks / totalTasks) * 100;
+  const [dashboardData, setDashboardData] = useState(null);
+  const [budgetLimit, setBudgetLimit] = useState(1300);
+  const [loading, setLoading] = useState(true);
 
-  const totalSpent = 341.2;
-  const budgetLimit = 1300;
-  const budgetProgress = totalSpent / budgetLimit;
+  useFocusEffect(
+    useCallback(() => {
+      let isActive = true;
 
-  // Mock next task spotlight
-  const nextTask = {
-    title: "Work on Project Kaito",
-    time: "10:00 AM",
-    duration: "4h",
-    color: "#E7F5EC",
-    dot: "#39C16C",
-  };
+      const loadData = async () => {
+        try {
+          setLoading(true);
+          const today = new Date();
+          const year = today.getFullYear();
+          const month = today.getMonth() + 1;
+          
+          // To account for local timezone when getting YYYY-MM-DD
+          const offset = today.getTimezoneOffset()
+          const localDate = new Date(today.getTime() - (offset*60*1000))
+          const dateStr = localDate.toISOString().split("T")[0];
+
+          const response = await getDashboardDataAPI(dateStr, month, year);
+          const budgetRes = await getBudgetService(month, year);
+
+          if (isActive) {
+            if (response && response.success) {
+              setDashboardData(response.data);
+            }
+            if (budgetRes && budgetRes.data) {
+              setBudgetLimit(budgetRes.data.monthlyLimit || 1300);
+            }
+          }
+        } catch (error) {
+          console.error("Failed to load dashboard data", error);
+        } finally {
+          if (isActive) {
+            setLoading(false);
+          }
+        }
+      };
+
+      loadData();
+
+      return () => {
+        isActive = false;
+      };
+    }, [])
+  );
+
+  const totalTasks = dashboardData?.todoCard?.total || 0;
+  const completedTasks = dashboardData?.todoCard?.completed || 0;
+  const taskCompletionRate =
+    totalTasks > 0 ? (completedTasks / totalTasks) * 100 : 0;
+
+  const totalSpent = dashboardData?.expenseCard?.totalExpenseMonth || 0;
+  const budgetProgress = budgetLimit > 0 ? totalSpent / budgetLimit : 0;
+  const cappedBudgetProgress = budgetProgress > 1 ? 1 : budgetProgress; // Don't overflow the progress bar
+
+  const nextTaskObj = dashboardData?.topTodos?.[0];
+  const nextTask = nextTaskObj
+    ? {
+        title: nextTaskObj.title,
+        time: nextTaskObj.time,
+        duration: "Upcoming",
+        color: "#E7F5EC",
+        dot: "#39C16C",
+      }
+    : null;
 
   return (
     <ScreenWrapper
@@ -60,154 +115,167 @@ const Dashboard = ({ navigation }) => {
           </TouchableOpacity>
         </View>
 
-        {/* Unified Double Cards Widget */}
-        <View style={styles.statsContainer}>
-          {/* Tasks Progress Card */}
-          <TouchableOpacity
-            style={styles.statsCard}
-            activeOpacity={0.9}
-            onPress={() => navigation.navigate("Todo")}
-          >
-            <View style={styles.statsHeader}>
-              <Text style={styles.statsLabel}>TASKS TODAY</Text>
-              <View
-                style={[
-                  styles.statsIconBg,
-                  { backgroundColor: "rgba(99, 102, 241, 0.15)" },
-                ]}
+        {loading ? (
+          <ActivityIndicator size="large" color="#6366F1" style={{ marginTop: 40 }} />
+        ) : (
+          <>
+            {/* Unified Double Cards Widget */}
+            <View style={styles.statsContainer}>
+              {/* Tasks Progress Card */}
+              <TouchableOpacity
+                style={styles.statsCard}
+                activeOpacity={0.9}
+                onPress={() => navigation.navigate("Todo")}
               >
-                <Ionicons name="checkbox-outline" size={16} color="#818CF8" />
-              </View>
-            </View>
-            <Text style={styles.statsValue}>
-              {completedTasks}/{totalTasks}
-            </Text>
-            <Text style={styles.statsSub}>
-              {Math.round(taskCompletionRate)}% Done
-            </Text>
+                <View style={styles.statsHeader}>
+                  <Text style={styles.statsLabel}>TASKS TODAY</Text>
+                  <View
+                    style={[
+                      styles.statsIconBg,
+                      { backgroundColor: "rgba(99, 102, 241, 0.15)" },
+                    ]}
+                  >
+                    <Ionicons name="checkbox-outline" size={16} color="#818CF8" />
+                  </View>
+                </View>
+                <Text style={styles.statsValue}>
+                  {completedTasks}/{totalTasks}
+                </Text>
+                <Text style={styles.statsSub}>
+                  {Math.round(taskCompletionRate)}% Done
+                </Text>
 
-            {/* Task Progress Bar */}
-            <View style={styles.progressBarBg}>
-              <View
-                style={[
-                  styles.progressBarFill,
-                  {
-                    width: `${taskCompletionRate}%`,
-                    backgroundColor: "#6366F1",
-                  },
-                ]}
-              />
-            </View>
-          </TouchableOpacity>
+                {/* Task Progress Bar */}
+                <View style={styles.progressBarBg}>
+                  <View
+                    style={[
+                      styles.progressBarFill,
+                      {
+                        width: `${taskCompletionRate}%`,
+                        backgroundColor: "#6366F1",
+                      },
+                    ]}
+                  />
+                </View>
+              </TouchableOpacity>
 
-          {/* Budget Progress Card */}
-          <TouchableOpacity
-            style={styles.statsCard}
-            activeOpacity={0.9}
-            onPress={() => navigation.navigate("Expenses")}
-          >
-            <View style={styles.statsHeader}>
-              <Text style={styles.statsLabel}>BUDGET LEFT</Text>
-              <View
-                style={[
-                  styles.statsIconBg,
-                  { backgroundColor: "rgba(16, 185, 129, 0.15)" },
-                ]}
+              {/* Budget Progress Card */}
+              <TouchableOpacity
+                style={styles.statsCard}
+                activeOpacity={0.9}
+                onPress={() => navigation.navigate("Expenses")}
               >
-                <Ionicons name="wallet-outline" size={16} color="#34D399" />
-              </View>
-            </View>
-            <Text style={styles.statsValue}>
-              ${(budgetLimit - totalSpent).toFixed(0)}
-            </Text>
-            <Text style={styles.statsSub}>Limit: ${budgetLimit}</Text>
+                <View style={styles.statsHeader}>
+                  <Text style={styles.statsLabel}>BUDGET LEFT</Text>
+                  <View
+                    style={[
+                      styles.statsIconBg,
+                      { backgroundColor: "rgba(16, 185, 129, 0.15)" },
+                    ]}
+                  >
+                    <Ionicons name="wallet-outline" size={16} color="#34D399" />
+                  </View>
+                </View>
+                <Text style={styles.statsValue}>
+                  ${Math.max(0, budgetLimit - totalSpent).toFixed(0)}
+                </Text>
+                <Text style={styles.statsSub}>Limit: ${budgetLimit}</Text>
 
-            {/* Budget Progress Bar */}
-            <View style={styles.progressBarBg}>
-              <View
-                style={[
-                  styles.progressBarFill,
-                  {
-                    width: `${budgetProgress * 100}%`,
-                    backgroundColor: "#10B981",
-                  },
-                ]}
-              />
+                {/* Budget Progress Bar */}
+                <View style={styles.progressBarBg}>
+                  <View
+                    style={[
+                      styles.progressBarFill,
+                      {
+                        width: `${cappedBudgetProgress * 100}%`,
+                        backgroundColor:
+                          budgetProgress > 0.9 ? "#EF4444" : "#10B981", // Turns red if almost exhausted
+                      },
+                    ]}
+                  />
+                </View>
+              </TouchableOpacity>
             </View>
-          </TouchableOpacity>
-        </View>
 
-        {/* Quick Actions Hub */}
-        <Text style={styles.sectionTitle}>Quick Actions</Text>
-        <View style={styles.actionsContainer}>
-          <TouchableOpacity
-            style={styles.actionButton}
-            activeOpacity={0.8}
-            onPress={() => navigation.navigate("Todo")}
-          >
-            <LinearGradient
-              colors={["rgba(99, 102, 241, 0.1)", "rgba(168, 85, 247, 0.1)"]}
-              style={styles.actionGradient}
-            >
-              <View
-                style={[
-                  styles.actionIconWrapper,
-                  { backgroundColor: "rgba(99, 102, 241, 0.2)" },
-                ]}
+            {/* Quick Actions Hub */}
+            <Text style={styles.sectionTitle}>Quick Actions</Text>
+            <View style={styles.actionsContainer}>
+              <TouchableOpacity
+                style={styles.actionButton}
+                activeOpacity={0.8}
+                onPress={() => navigation.navigate("Todo")}
               >
-                <Ionicons name="add-circle-outline" size={24} color="#818CF8" />
-              </View>
-              <Text style={styles.actionButtonText}>Add New Task</Text>
-            </LinearGradient>
-          </TouchableOpacity>
+                <LinearGradient
+                  colors={["rgba(99, 102, 241, 0.1)", "rgba(168, 85, 247, 0.1)"]}
+                  style={styles.actionGradient}
+                >
+                  <View
+                    style={[
+                      styles.actionIconWrapper,
+                      { backgroundColor: "rgba(99, 102, 241, 0.2)" },
+                    ]}
+                  >
+                    <Ionicons name="add-circle-outline" size={24} color="#818CF8" />
+                  </View>
+                  <Text style={styles.actionButtonText}>Add New Task</Text>
+                </LinearGradient>
+              </TouchableOpacity>
 
-          <TouchableOpacity
-            style={styles.actionButton}
-            activeOpacity={0.8}
-            onPress={() => navigation.navigate("Expenses")}
-          >
-            <LinearGradient
-              colors={["rgba(16, 185, 129, 0.1)", "rgba(59, 130, 246, 0.1)"]}
-              style={styles.actionGradient}
-            >
-              <View
-                style={[
-                  styles.actionIconWrapper,
-                  { backgroundColor: "rgba(16, 185, 129, 0.2)" },
-                ]}
+              <TouchableOpacity
+                style={styles.actionButton}
+                activeOpacity={0.8}
+                onPress={() => navigation.navigate("Expenses")}
               >
-                <Ionicons name="cash-outline" size={24} color="#34D399" />
-              </View>
-              <Text style={styles.actionButtonText}>Add Expense</Text>
-            </LinearGradient>
-          </TouchableOpacity>
-        </View>
-
-        {/* Next Up Spotlight */}
-        <Text style={styles.sectionTitle}>Next Up Today</Text>
-        <TouchableOpacity
-          style={styles.spotlightCard}
-          activeOpacity={0.9}
-          onPress={() => navigation.navigate("Todo")}
-        >
-          <View style={styles.spotlightLeftBorder} />
-          <View style={styles.spotlightContent}>
-            <View style={styles.spotlightMeta}>
-              <View style={styles.spotlightDot} />
-              <Text style={styles.spotlightTime}>{nextTask.time}</Text>
-              <Text style={styles.spotlightDuration}>
-                ({nextTask.duration})
-              </Text>
+                <LinearGradient
+                  colors={["rgba(16, 185, 129, 0.1)", "rgba(59, 130, 246, 0.1)"]}
+                  style={styles.actionGradient}
+                >
+                  <View
+                    style={[
+                      styles.actionIconWrapper,
+                      { backgroundColor: "rgba(16, 185, 129, 0.2)" },
+                    ]}
+                  >
+                    <Ionicons name="cash-outline" size={24} color="#34D399" />
+                  </View>
+                  <Text style={styles.actionButtonText}>Add Expense</Text>
+                </LinearGradient>
+              </TouchableOpacity>
             </View>
-            <Text style={styles.spotlightTitle}>{nextTask.title}</Text>
-          </View>
-          <Ionicons
-            name="chevron-forward"
-            size={20}
-            color="#64748B"
-            style={styles.spotlightArrow}
-          />
-        </TouchableOpacity>
+
+            {/* Next Up Spotlight */}
+            <Text style={styles.sectionTitle}>Next Up Today</Text>
+            {nextTask ? (
+              <TouchableOpacity
+                style={styles.spotlightCard}
+                activeOpacity={0.9}
+                onPress={() => navigation.navigate("Todo")}
+              >
+                <View style={styles.spotlightLeftBorder} />
+                <View style={styles.spotlightContent}>
+                  <View style={styles.spotlightMeta}>
+                    <View style={styles.spotlightDot} />
+                    <Text style={styles.spotlightTime}>{nextTask.time}</Text>
+                    <Text style={styles.spotlightDuration}>
+                      ({nextTask.duration})
+                    </Text>
+                  </View>
+                  <Text style={styles.spotlightTitle}>{nextTask.title}</Text>
+                </View>
+                <Ionicons
+                  name="chevron-forward"
+                  size={20}
+                  color="#64748B"
+                  style={styles.spotlightArrow}
+                />
+              </TouchableOpacity>
+            ) : (
+              <View style={[styles.spotlightCard, { justifyContent: "center", paddingVertical: 30 }]}>
+                 <Text style={{ color: "#64748B", fontSize: 14 }}>No upcoming tasks for today.</Text>
+              </View>
+            )}
+          </>
+        )}
       </View>
     </ScreenWrapper>
   );
