@@ -1,5 +1,5 @@
 import { loginService, registerService } from "../services/auth.service.js";
-import generateToken from "../utils/generateToken.js";
+import generateToken from "../utils/generate-token.js";
 
 export const registerController = async (req, res) => {
   try {

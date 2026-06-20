@@ -1,6 +1,6 @@
 import express from "express";
 import helmet from "helmet";
-import { errorHandler, notFound } from "./middlewares/errorMiddleware.js";
+import { errorHandler, notFound } from "./middlewares/error.middleware.js";
 import authRoutes from "./routes/auth.routes.js";
 import todoRoutes from "./routes/todo.routes.js";
 import cors from "cors";
