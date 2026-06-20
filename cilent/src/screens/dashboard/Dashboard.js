@@ -35,35 +35,85 @@ const DashboardSkeleton = () => {
           duration: 800,
           useNativeDriver: true,
         }),
-      ])
+      ]),
     ).start();
   }, [fadeAnim]);
 
   return (
-    <Animated.View style={{ opacity: fadeAnim, width: '100%', marginTop: 10 }}>
+    <Animated.View style={{ opacity: fadeAnim, width: "100%", marginTop: 10 }}>
       {/* Stats Cards */}
-      <View style={{ flexDirection: 'row', gap: 12, marginBottom: 24 }}>
-        <View style={{ flex: 1, height: 130, backgroundColor: 'rgba(255,255,255,0.08)', borderRadius: 20 }} />
-        <View style={{ flex: 1, height: 130, backgroundColor: 'rgba(255,255,255,0.08)', borderRadius: 20 }} />
+      <View style={{ flexDirection: "row", gap: 12, marginBottom: 24 }}>
+        <View
+          style={{
+            flex: 1,
+            height: 130,
+            backgroundColor: "rgba(255,255,255,0.08)",
+            borderRadius: 20,
+          }}
+        />
+        <View
+          style={{
+            flex: 1,
+            height: 130,
+            backgroundColor: "rgba(255,255,255,0.08)",
+            borderRadius: 20,
+          }}
+        />
       </View>
       {/* Quick Actions Title */}
-      <View style={{ width: 120, height: 20, backgroundColor: 'rgba(255,255,255,0.08)', borderRadius: 10, marginBottom: 14 }} />
+      <View
+        style={{
+          width: 120,
+          height: 20,
+          backgroundColor: "rgba(255,255,255,0.08)",
+          borderRadius: 10,
+          marginBottom: 14,
+        }}
+      />
       {/* Quick Actions Buttons */}
-      <View style={{ flexDirection: 'row', gap: 12, marginBottom: 24 }}>
-        <View style={{ flex: 1, height: 68, backgroundColor: 'rgba(255,255,255,0.08)', borderRadius: 16 }} />
-        <View style={{ flex: 1, height: 68, backgroundColor: 'rgba(255,255,255,0.08)', borderRadius: 16 }} />
+      <View style={{ flexDirection: "row", gap: 12, marginBottom: 24 }}>
+        <View
+          style={{
+            flex: 1,
+            height: 68,
+            backgroundColor: "rgba(255,255,255,0.08)",
+            borderRadius: 16,
+          }}
+        />
+        <View
+          style={{
+            flex: 1,
+            height: 68,
+            backgroundColor: "rgba(255,255,255,0.08)",
+            borderRadius: 16,
+          }}
+        />
       </View>
       {/* Next Up Title */}
-      <View style={{ width: 140, height: 20, backgroundColor: 'rgba(255,255,255,0.08)', borderRadius: 10, marginBottom: 14 }} />
+      <View
+        style={{
+          width: 140,
+          height: 20,
+          backgroundColor: "rgba(255,255,255,0.08)",
+          borderRadius: 10,
+          marginBottom: 14,
+        }}
+      />
       {/* Spotlight Card */}
-      <View style={{ height: 90, backgroundColor: 'rgba(255,255,255,0.08)', borderRadius: 20 }} />
+      <View
+        style={{
+          height: 90,
+          backgroundColor: "rgba(255,255,255,0.08)",
+          borderRadius: 20,
+        }}
+      />
     </Animated.View>
   );
 };
 
 const Dashboard = ({ navigation }) => {
   const [dashboardData, setDashboardData] = useState(null);
-  const [budgetLimit, setBudgetLimit] = useState(1300);
+  const [budgetLimit, setBudgetLimit] = useState(0);
   const [loading, setLoading] = useState(true);
 
   useFocusEffect(
@@ -76,10 +126,10 @@ const Dashboard = ({ navigation }) => {
           const today = new Date();
           const year = today.getFullYear();
           const month = today.getMonth() + 1;
-          
+
           // To account for local timezone when getting YYYY-MM-DD
-          const offset = today.getTimezoneOffset()
-          const localDate = new Date(today.getTime() - (offset*60*1000))
+          const offset = today.getTimezoneOffset();
+          const localDate = new Date(today.getTime() - offset * 60 * 1000);
           const dateStr = localDate.toISOString().split("T")[0];
 
           const response = await getDashboardDataAPI(dateStr, month, year);
@@ -90,7 +140,7 @@ const Dashboard = ({ navigation }) => {
               setDashboardData(response.data);
             }
             if (budgetRes && budgetRes.data) {
-              setBudgetLimit(budgetRes.data.monthlyLimit || 1300);
+              setBudgetLimit(budgetRes.data.monthlyLimit || 0);
             }
           }
         } catch (error) {
@@ -107,7 +157,7 @@ const Dashboard = ({ navigation }) => {
       return () => {
         isActive = false;
       };
-    }, [])
+    }, []),
   );
 
   const totalTasks = dashboardData?.todoCard?.total || 0;
@@ -142,7 +192,11 @@ const Dashboard = ({ navigation }) => {
         <View style={styles.header}>
           <View>
             <Text style={styles.welcomeText}>
-              Hello, {dashboardData?.user?.name ? dashboardData.user.name.split(' ')[0] : "User"} 👋
+              Hello,{" "}
+              {dashboardData?.user?.name
+                ? dashboardData.user.name.split(" ")[0]
+                : "User"}{" "}
+              👋
             </Text>
             <Text style={styles.subtitleText}>Ready to tackle today?</Text>
           </View>
@@ -156,7 +210,9 @@ const Dashboard = ({ navigation }) => {
               style={styles.profileGradient}
             >
               <Text style={styles.profileInitial}>
-                {dashboardData?.user?.name ? dashboardData.user.name.charAt(0).toUpperCase() : "U"}
+                {dashboardData?.user?.name
+                  ? dashboardData.user.name.charAt(0).toUpperCase()
+                  : "U"}
               </Text>
             </LinearGradient>
           </TouchableOpacity>
@@ -182,7 +238,11 @@ const Dashboard = ({ navigation }) => {
                       { backgroundColor: "rgba(99, 102, 241, 0.15)" },
                     ]}
                   >
-                    <Ionicons name="checkbox-outline" size={16} color="#818CF8" />
+                    <Ionicons
+                      name="checkbox-outline"
+                      size={16}
+                      color="#818CF8"
+                    />
                   </View>
                 </View>
                 <Text style={styles.statsValue}>
@@ -253,7 +313,10 @@ const Dashboard = ({ navigation }) => {
                 onPress={() => navigation.navigate("Todo")}
               >
                 <LinearGradient
-                  colors={["rgba(99, 102, 241, 0.1)", "rgba(168, 85, 247, 0.1)"]}
+                  colors={[
+                    "rgba(99, 102, 241, 0.1)",
+                    "rgba(168, 85, 247, 0.1)",
+                  ]}
                   style={styles.actionGradient}
                 >
                   <View
@@ -262,7 +325,11 @@ const Dashboard = ({ navigation }) => {
                       { backgroundColor: "rgba(99, 102, 241, 0.2)" },
                     ]}
                   >
-                    <Ionicons name="add-circle-outline" size={24} color="#818CF8" />
+                    <Ionicons
+                      name="add-circle-outline"
+                      size={24}
+                      color="#818CF8"
+                    />
                   </View>
                   <Text style={styles.actionButtonText}>Add New Task</Text>
                 </LinearGradient>
@@ -274,7 +341,10 @@ const Dashboard = ({ navigation }) => {
                 onPress={() => navigation.navigate("Expenses")}
               >
                 <LinearGradient
-                  colors={["rgba(16, 185, 129, 0.1)", "rgba(59, 130, 246, 0.1)"]}
+                  colors={[
+                    "rgba(16, 185, 129, 0.1)",
+                    "rgba(59, 130, 246, 0.1)",
+                  ]}
                   style={styles.actionGradient}
                 >
                   <View
@@ -317,8 +387,15 @@ const Dashboard = ({ navigation }) => {
                 />
               </TouchableOpacity>
             ) : (
-              <View style={[styles.spotlightCard, { justifyContent: "center", paddingVertical: 30 }]}>
-                 <Text style={{ color: "#64748B", fontSize: 14 }}>No upcoming tasks for today.</Text>
+              <View
+                style={[
+                  styles.spotlightCard,
+                  { justifyContent: "center", paddingVertical: 30 },
+                ]}
+              >
+                <Text style={{ color: "#64748B", fontSize: 14 }}>
+                  No upcoming tasks for today.
+                </Text>
               </View>
             )}
           </>

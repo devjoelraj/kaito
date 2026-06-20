@@ -18,6 +18,8 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 import DateTimePicker from "@react-native-community/datetimepicker";
 import MaterialIcons from "@expo/vector-icons/MaterialIcons";
 import { Swipeable } from "react-native-gesture-handler";
+import { useDispatch } from "react-redux";
+import { logoutUser } from "../../store/slices/authSlice";
 import ScreenWrapper from "../../components/layout/AppWrapper";
 import FloatingBar from "../../components/FloatingBar";
 import LoadingSpinner from "../../components/loading/LoadingSpinner";
@@ -58,6 +60,7 @@ const getWeekDates = () => {
 };
 
 const TodoList = ({ navigation }) => {
+  const dispatch = useDispatch();
   const [taskList, setTaskList] = useState([]);
   const [loading, setLoading] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
@@ -88,13 +91,13 @@ const TodoList = ({ navigation }) => {
     try {
       const token = await AsyncStorage.getItem("token");
       if (!token) {
-        navigation.replace("Auth"); // Switch to Auth stack
+        dispatch(logoutUser());
       } else {
         setIsAuthenticated(true);
       }
     } catch (error) {
       console.error("Auth check error:", error);
-      navigation.replace("Auth");
+      dispatch(logoutUser());
     }
   };
 
@@ -171,9 +174,8 @@ const TodoList = ({ navigation }) => {
     } catch (error) {
       console.error("Fetch todos error:", error);
       if (error.response?.status === 401) {
-        await AsyncStorage.removeItem("token");
         Alert.alert("Session Expired", "Please login again.", [
-          { text: "OK", onPress: () => navigation.replace("Auth") },
+          { text: "OK", onPress: () => dispatch(logoutUser()) },
         ]);
       } else {
         Alert.alert("Error", "Failed to load todos. Please try again.");
@@ -297,7 +299,7 @@ const TodoList = ({ navigation }) => {
       console.error("Save task error:", error);
       if (error.response?.status === 401) {
         Alert.alert("Session Expired", "Please login again.", [
-          { text: "OK", onPress: () => navigation.replace("Auth") },
+          { text: "OK", onPress: () => dispatch(logoutUser()) },
         ]);
       } else {
         Alert.alert("Error", "Failed to save task. Please try again.");
@@ -322,7 +324,7 @@ const TodoList = ({ navigation }) => {
             console.error("Delete task error:", error);
             if (error.response?.status === 401) {
               Alert.alert("Session Expired", "Please login again.", [
-                { text: "OK", onPress: () => navigation.replace("Auth") },
+                { text: "OK", onPress: () => dispatch(logoutUser()) },
               ]);
             } else {
               Alert.alert("Error", "Failed to delete task. Please try again.");

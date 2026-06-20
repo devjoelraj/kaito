@@ -10,12 +10,15 @@ import {
 } from "react-native";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useFocusEffect } from "@react-navigation/native";
+import { useDispatch } from "react-redux";
 import ScreenWrapper from "../../components/layout/AppWrapper";
 import { LinearGradient } from "expo-linear-gradient";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import { getProfileAPI } from "../../api/dashBoard";
+import { logoutUser } from "../../store/slices/authSlice";
 
 const Profile = ({ navigation }) => {
+  const dispatch = useDispatch();
   const [loggingOut, setLoggingOut] = useState(false);
   const [userData, setUserData] = useState(null);
   const [loadingProfile, setLoadingProfile] = useState(true);
@@ -60,11 +63,7 @@ const Profile = ({ navigation }) => {
           onPress: async () => {
             setLoggingOut(true);
             try {
-              await AsyncStorage.removeItem("token");
-              navigation.reset({
-                index: 0,
-                routes: [{ name: "Auth" }],
-              });
+              dispatch(logoutUser());
             } catch (error) {
               console.error("Error logging out: ", error);
               setLoggingOut(false);

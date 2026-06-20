@@ -8,15 +8,16 @@ import {
   ActivityIndicator,
 } from "react-native";
 
-import AsyncStorage from "@react-native-async-storage/async-storage";
+import { useDispatch } from "react-redux";
 import { LinearGradient } from "expo-linear-gradient";
 import Ionicons from "@expo/vector-icons/Ionicons";
 
 import ScreenWrapper from "../../components/layout/AppWrapper";
-
 import { loginService, registerService } from "../../api/authServices";
+import { loginUser } from "../../store/slices/authSlice";
 
 const LoginScreen = ({ navigation }) => {
+  const dispatch = useDispatch();
   const [isLogin, setIsLogin] = useState(true);
 
   const [name, setName] = useState("");
@@ -55,9 +56,8 @@ const LoginScreen = ({ navigation }) => {
         response = await registerService(name, email, password);
       }
 
-      await AsyncStorage.setItem("token", response.token);
+      dispatch(loginUser(response.token));
 
-      navigation.replace("bottom");
     } catch (error) {
       setErrorMessage(
         error?.response?.data?.message ||
@@ -176,9 +176,8 @@ const LoginScreen = ({ navigation }) => {
           </TouchableOpacity>
 
           <TouchableOpacity
-            onPress={async () => {
-              await AsyncStorage.removeItem("token");
-              navigation.replace("bottom");
+            onPress={() => {
+              dispatch(loginUser("demo-token"));
             }}
             style={styles.demoContainer}
           >
