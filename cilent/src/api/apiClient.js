@@ -2,7 +2,7 @@ import axios from "axios";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 
 const apiClient = axios.create({
-  baseURL: "http://10.226.166.130:3000",
+  baseURL: "https://kaito-i1gp.onrender.com",
   headers: {
     "Content-Type": "application/json",
   },
@@ -18,7 +18,7 @@ apiClient.interceptors.request.use(
   },
   (error) => {
     return Promise.reject(error);
-  }
+  },
 );
 
 apiClient.interceptors.response.use(
@@ -32,7 +32,7 @@ apiClient.interceptors.response.use(
       console.log("Interceptor: 401 Unauthorized, token cleared from storage");
     }
     return Promise.reject(error);
-  }
+  },
 );
 
 export default apiClient;
